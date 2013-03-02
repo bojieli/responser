@@ -2,11 +2,6 @@
 #include "Students.h"
 #include "localsto.h"
 
-
-
-
-
-
 Students allStu;
 StuStaticList stuNames;
 

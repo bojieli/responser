@@ -1,14 +1,12 @@
 #include "StdAfx.h"
 #include "Students.h"
-#include "localsto.h"
-
-Students allStu;
-StuStaticList stuNames;
 
 Stu::Stu(void)
 {
 	Ans = 0;
 	ansTime = 0;
+	next = NULL;
+	IsAtClass = false;
 }
 Stu::Stu(BYTE* ID1,BYTE* ProductID1,CString Name1)
 {
@@ -19,17 +17,21 @@ Stu::Stu(BYTE* ID1,BYTE* ProductID1,CString Name1)
 	Name = Name1;
 	Ans = 0;
 	ansTime = 0;
+	next = NULL;
+	IsAtClass = false;
 }
 Stu::~Stu(void)
 {
+	
 }
 bool Stu::isMyProduct(BYTE* ProductID1)
 {
 	for(int i = 0; i<PID_LENGTH; i++)
 		if (ProductID1[i] != ProductID[i])
 			return false;
-	return true;
+			return true;
 }
+
 
 
 Students::Students(void)
@@ -38,9 +40,8 @@ Students::Students(void)
 	this->head->next = NULL;
 	this->QuesTotal = 0;
 	this->StudTotal = 0;
-	this->isStarted =false;
-	this->localSto = new LocalSto;
-	this->localSto->initStuNames(&(this->m_List));
+	isStarted =false;
+	StuAtClass = 0;
 }
 Students::~Students(void)
 {
@@ -71,32 +72,73 @@ Stu* Students::Find(BYTE* ProductID)
 }
 void Students::Start()
 {
+
 	this->isStarted = true;
 	this->QuesTotal++;
-	this->beginTime = (unsigned long)time(NULL);
 	Stu* temp = head;
+	m_Lock.Lock();
+	
+		for(int i = 0;i<64;i++)
+			AnswerCount[i] = 0;
+	
+	m_Lock.Unlock();
 	while((temp = temp->next)!=NULL)
 	{
+		m_Lock.Lock();
+	
+			AnswerCount[0]++;
+
+		m_Lock.Unlock();
 		temp->Ans = 0;
 		temp->ansTime = 0;
 	}
 }
 void Students::USBAddCorAnswer(BYTE ANS)
 {
-	this->CorAnswer.Ans = ANS; // 正确答案无需记录时间，记为0
-	this->CorAnswer.ansTime = 0;
+	m_Lock.Lock();
+	
+		this->CorAnswer.Ans = ANS; // 正确答案无需记录时间，记为0
+		this->CorAnswer.ansTime = 0;
+	
+	m_Lock.Unlock();
 }
 int Students::USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime)
 {
-	if (ANS == 0)
-
-	if (!this->isStarted)
-		return -1;
+	//if (!this->isStarted)
+//		return -1;
 	Stu *now = Find(ProductID);
 	if(now!=NULL)
 	{
-		now->Ans = ANS;
-		now->ansTime = ansTime;
+		
+		if(now->Ans==0)
+		{
+			m_Lock.Lock();
+	
+				StuAlreadyAns++;
+			
+			m_Lock.Unlock();
+		}
+		if(!now->IsAtClass)
+		{
+			m_Lock.Lock();
+			
+				StuAtClass++;
+
+			m_Lock.Unlock();
+			now->IsAtClass = true;
+		}
+		if(now->Ans!=ANS)
+		{
+			m_Lock.Lock();
+	
+				AnswerCount[now->Ans]--;
+				AnswerCount[ANS]++;
+			
+			m_Lock.Unlock();
+			now->Ans = ANS;
+		}
+		now->ansTime = ansTime;	
+		
 		return 1;
 	}
 	else
@@ -107,30 +149,38 @@ int Students::USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime)
 bool Students::End(void) // 若发送到服务器则返回1，若保存到U盘则返回0
 {
 	this->isStarted = false;
-	localSto->save(this);
 	return 0;
 }
-bool Students::USBRegister(BYTE* newID,BYTE* newProductID) //返回 1 表示原有，返回 0 表示新增
+bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //返回 1 表示原有，返回 0 表示新增
 {
 	Stu* now;
 	StuStatic* ListTemp;
-	ListTemp = m_List.FindStu(newID);
-	if((now = Find(newProductID)) == NULL) // 新增
+	ListTemp = m_List.FindStu(ID);
+	if((now = Find(ProductID))==NULL)
 	{
 		if(ListTemp==NULL)
-			Add(newID, newProductID, _T("匿名"));
+		{
+			Add(ID,ProductID,_T("匿名"));
+		}
 		else
-			Add(newID, newProductID, ListTemp->Name);
-		return false;
+		{
+			Add(ID,ProductID,ListTemp->Name);
+		}
+		return 0;
 	}
-	else // 已有
+	else
 	{
 		for(int i =0;i< ID_LENGTH;i++)
-			now->ID[i] = newID[i]; // 学号
+			now->ID[i] = ID[i];
 		if(ListTemp==NULL)
+		{
 			now->Name = _T("匿名");
+		}
 		else
 			now->Name = ListTemp->Name;
-		return true;
 	}
 }
+
+
+Students allStu;
+CCriticalSection m_Lock;//线程同步

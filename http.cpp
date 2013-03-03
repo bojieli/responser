@@ -33,13 +33,12 @@ void CloudConn::SetBody(CString key, CString value)
 }
 CString CloudConn::send()
 {
-    file->SendRequest(NULL, 0, postData, postData.GetLength());
+    file->SendRequest(NULL, 0, (LPVOID)(LPCTSTR)postData, postData.GetLength());
     DWORD dwRet;
     file->QueryInfoStatusCode(dwRet);
     
     if(dwRet != HTTP_STATUS_OK) {
 		Error(E_WARNING, "与云端间的数据通信错误");
-		return NULL;
     }
 	CString response;
     CString tmp;

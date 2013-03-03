@@ -33,7 +33,6 @@ bool Stu::isMyProduct(BYTE* ProductID1)
 }
 
 
-
 Students::Students(void)
 {
 	this->head = new Stu;
@@ -166,7 +165,7 @@ bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //·µ»Ø 1 ±íÊ¾Ô­ÓĞ£¬·µ»Ø 0 ±
 		{
 			Add(ID,ProductID,ListTemp->Name);
 		}
-		return 0;
+		return false;
 	}
 	else
 	{
@@ -178,6 +177,7 @@ bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //·µ»Ø 1 ±íÊ¾Ô­ÓĞ£¬·µ»Ø 0 ±
 		}
 		else
 			now->Name = ListTemp->Name;
+		return true;
 	}
 }
 

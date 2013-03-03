@@ -35,6 +35,7 @@ static BYTE* toBytes(long num, int count)
 		buf[i] = num & 0xFF;
 		num>>=8;
 	}
+	return buf;
 }
 bool LocalSto::save(Students *s)
 {
@@ -42,14 +43,17 @@ bool LocalSto::save(Students *s)
 	this->insert("problem", "lecture,problem,begin_time,end_time,corrent_ans",
 		this->lectureID, s->QuesTotal, s->beginTime, currTime, s->CorAnswer.Ans);
 	Stu* stu = s->head;
+	bool success = true;
 	while ((stu = stu->next) != NULL) {
-		this->insert("answer", "lecture,problem,product,answer,ans_time",
-			this->lectureID, s->QuesTotal, toLong(stu->ProductID,4), stu->Ans, stu->ansTime);
+		if (!this->insert("answer", "lecture,problem,product,answer,ans_time",
+			this->lectureID, s->QuesTotal, toLong(stu->ProductID,4), stu->Ans, stu->ansTime))
+			success = false;
 	}
+	return success;
 }
 bool LocalSto::stuRegister(Stu* stu)
 {
-	this->squery("REPLACE INTO product (product_id,student_id) VALUES ('%ld','%ld')", toLong((BYTE *)(LPCTSTR)stu->ProductID, 4), toLong((BYTE *)stu->ID, 5));
+	return this->squery("REPLACE INTO product (product_id,student_id) VALUES ('%ld','%ld')", toLong((BYTE *)(LPCTSTR)stu->ProductID, 4), toLong((BYTE *)stu->ID, 5));
 }
 
 char* addslashesForSpace(char* str);
@@ -135,6 +139,7 @@ bool LocalSto::initStuNames(StuStaticList* m_List)
 		m_List->NewStuStatic(CString(name), (BYTE*)toBytes(student_id,5)); // 姓名是字符串，学号是5字节整数
 	}
 	sqlite3_finalize(stmt);
+	return true;
 }
 
 // 下面是私有函数
@@ -213,7 +218,7 @@ bool LocalSto::squery(const char* format, ...)
 	char sql[SQL_MAXLEN];
 	va_list args;
 	va_start(args, format);
-	vsprintf(sql, format, args);
+	vsprintf_s(sql, format, args);
 	va_end(args);
 	return LocalSto::query(sql);
 }
@@ -224,8 +229,8 @@ bool LocalSto::query(const char* sql, int (*callback)(void*,int,char**,char**), 
 
 bool LocalSto::insert(const char* table, const char* fields, char* data1, ...)
 {
-	char sql[SQL_MAXLEN];
-	sprintf(sql, "INSERT INTO %s (%s) VALUES (", table, fields);
+	CString sql;
+ 	sql.Format(L"INSERT INTO %s (%s) VALUES (", table, fields);
 	va_list args;
 	va_start(args, data1);
 	bool isFirst = true;
@@ -233,21 +238,19 @@ bool LocalSto::insert(const char* table, const char* fields, char* data1, ...)
 		if (isFirst)
 			isFirst = false;
 		else
-			strncat(sql, ",", SQL_MAXLEN);
-		strncat(sql, "'", SQL_MAXLEN);
-		strncat(sql, addslashes(data), SQL_MAXLEN);
-		strncat(sql, "'", SQL_MAXLEN);
+			sql += CString(",");
+		sql += CString("'");
+		sql += CString(addslashes(data));
+		sql += CString("'");
 	}
 	va_end(args);
-	strncat(sql, ")", SQL_MAXLEN);
-	return this->query(sql);
+	sql += CString(")");
+	return this->query((LPCSTR)(LPCTSTR)sql);
 }
 bool LocalSto::insert(const char* table, const char* fields, long data1, ...)
 {
-	char sql[SQL_MAXLEN] = {0};
-	char* end;
-	sprintf(sql, "INSERT INTO %s (%s) VALUES (", table, fields);
-	end = sql + strlen(sql);
+	CString sql;
+	sql.Format(L"INSERT INTO %s (%s) VALUES (", table, fields);
 	va_list args;
 	va_start(args, data1);
 	bool isFirst = true;
@@ -255,12 +258,12 @@ bool LocalSto::insert(const char* table, const char* fields, long data1, ...)
 		if (isFirst)
 			isFirst = false;
 		else
-			*end++ = ',';
-		sprintf(end, "%ld", data);
-		while (*end++ != '\0');
+			sql += CString(",");
+		CString data_int;
+		data_int.Format(L"%ld", data);
+		sql += data_int;
 	}
 	va_end(args);
-	*end++ = ')';
-	*end++ = '\0';
-	return this->query(sql);
+	sql += CString(")");
+	return this->query((LPCSTR)(LPCTSTR)sql);
 }

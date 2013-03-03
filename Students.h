@@ -1,4 +1,6 @@
 #pragma once
+#include "stdafx.h"
+#include "afxmt.h"
 /******************************************文件说明*****************************************
 Students.h 以及 Students.cpp 主要用于存储学生答题
 结构体 Answer 存储一个答案
@@ -92,7 +94,6 @@ public:
 		}
 		return 0;
 	}
-
 };
 
 class Stu
@@ -111,7 +112,6 @@ public: //一个学生的基本信息
 	unsigned int ansTime;//答题所需要的时间
 	bool IsAtClass;
 	bool isMyProduct(BYTE* ProductID1);//输入ProductID是否一样，用于查找
-	
 };
 
 class Students
@@ -119,13 +119,14 @@ class Students
 public:
 	Students(void);
 	~Students(void);
-protected:
+public: //数据
 	Stu* head; //学生链表
-public:
-	Stu* Add(BYTE* ID,BYTE* ProductID, CString Name);//添加学生
-	Stu* Find(BYTE* ProductID);
+	long beginTime;//开始时间
 	Stu CorAnswer;//存储正确答案
 	StuStaticList m_List;//静态名单
+public: //学生操作
+	Stu* Add(BYTE* ID,BYTE* ProductID, CString Name);//添加学生
+	Stu* Find(BYTE* ProductID);//查找学生
 public: //答题基本情况
 	int QuesTotal;//题目总数,显示所需要的数据
 	int StudTotal;//学生总数，显示所需要的数据

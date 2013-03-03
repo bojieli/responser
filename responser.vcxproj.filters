@@ -42,6 +42,9 @@
     <ClInclude Include="http.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -59,6 +62,9 @@
     <ClCompile Include="localsto.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="common.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="responser.rc">
@@ -66,9 +72,11 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="localsto\sqlite3.dll" />
     <None Include="localsto\initdb.sql">
       <Filter>资源文件</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="localsto\sqlite3.lib" />
   </ItemGroup>
 </Project>

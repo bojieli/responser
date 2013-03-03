@@ -58,6 +58,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>localsto\sqlite3.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -81,6 +82,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="common.h" />
     <ClInclude Include="http.h" />
     <ClInclude Include="localsto.h" />
     <ClInclude Include="Resource.h" />
@@ -91,6 +93,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="http.cpp" />
     <ClCompile Include="localsto.cpp" />
     <ClCompile Include="responser.cpp" />
@@ -105,7 +108,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="localsto\initdb.sql" />
-    <None Include="localsto\sqlite3.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="localsto\sqlite3.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

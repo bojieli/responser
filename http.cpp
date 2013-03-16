@@ -3,23 +3,29 @@
 
 CloudConn::CloudConn(const char* path)
 {
-	session.SetOption(INTERNET_OPTION_CONNECT_TIMEOUT, 1000 * 3);
-    session.SetOption(INTERNET_OPTION_CONNECT_BACKOFF, 1000);
-    session.SetOption(INTERNET_OPTION_CONNECT_RETRIES, 2);
-	conn = session.GetHttpConnection((LPCTSTR)"api.gewuit.com");
-	file = conn->OpenRequest(CHttpConnection::HTTP_VERB_POST,
-                             CString("/responser/") + path,
-                             NULL,
-                             1,
-                             NULL,
-                             TEXT("HTTP/1.1"),
-                             INTERNET_FLAG_RELOAD);
+	try {
+		session = new CInternetSession(L"responser");
+		session->SetOption(INTERNET_OPTION_CONNECT_TIMEOUT, 1000 * 3);
+		session->SetOption(INTERNET_OPTION_CONNECT_BACKOFF, 1000);
+		session->SetOption(INTERNET_OPTION_CONNECT_RETRIES, 2);
+		conn = session->GetHttpConnection(L"api.gewuit.com");
+		file = conn->OpenRequest(CHttpConnection::HTTP_VERB_POST,
+								 CString(L"/responser/") + path,
+								 NULL,
+								 1,
+								 NULL,
+								 TEXT("HTTP/1.1"),
+								 INTERNET_FLAG_RELOAD);
+	} catch(CInternetException * m_pException) {
+		m_pException->Delete();
+		Error(E_WARNING, L"无法连接到服务器");
+	}
 }
 CloudConn::~CloudConn()
 {
 	file->Close();
     conn->Close();
-    session.Close();
+    session->Close();
     delete file;
     delete conn;
 }
@@ -33,12 +39,16 @@ void CloudConn::SetBody(CString key, CString value)
 }
 CString CloudConn::send()
 {
-    file->SendRequest(NULL, 0, (LPVOID)(LPCTSTR)postData, postData.GetLength());
-    DWORD dwRet;
-    file->QueryInfoStatusCode(dwRet);
-    
+	DWORD dwRet;
+	try {
+		file->SendRequest(NULL, 0, (LPVOID)(LPCTSTR)postData, postData.GetLength());
+	} catch(CInternetException * m_pException) {
+		m_pException->Delete();
+		Error(E_WARNING, L"无法连接到服务器");
+	}
+	file->QueryInfoStatusCode(dwRet);
     if(dwRet != HTTP_STATUS_OK) {
-		Error(E_WARNING, "与云端间的数据通信错误");
+		Error(E_WARNING, L"与云端间的数据通信错误");
     }
 	CString response;
     CString tmp;

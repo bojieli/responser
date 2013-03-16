@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "Students.h"
+#include "localsto.h"
 
 Stu::Stu(void)
 {
@@ -29,7 +30,7 @@ bool Stu::isMyProduct(BYTE* ProductID1)
 	for(int i = 0; i<PID_LENGTH; i++)
 		if (ProductID1[i] != ProductID[i])
 			return false;
-			return true;
+	return true;
 }
 
 
@@ -41,6 +42,7 @@ Students::Students(void)
 	this->StudTotal = 0;
 	isStarted =false;
 	StuAtClass = 0;
+	Sto.initStuNames(&this->m_List);
 }
 Students::~Students(void)
 {
@@ -51,6 +53,13 @@ Students::~Students(void)
 		delete temp;
 	}
 }
+/* @brief	ÃÌº”—ß…˙
+ * @param	ID —ß∫≈
+ * @param	ProductID ≤˙∆∑ID
+ * @param	Name —ß…˙–’√˚
+ * @return	ππ‘Ï≥ˆµƒ—ß…˙∂‘œÛ
+ * @note	‘⁄≥ı ºªØ—ß…˙¡–±Ì°¢ƒ‰√˚¥Ã‚∆˜º”»Î ±£¨ª·µ˜”√¥À∫Ø ˝
+ */
 Stu* Students::Add(BYTE* ID,BYTE* ProductID, CString Name)
 {
 	Stu *now = new Stu(ID,ProductID,Name);
@@ -59,6 +68,10 @@ Stu* Students::Add(BYTE* ID,BYTE* ProductID, CString Name)
 	StudTotal++;
 	return now;
 }
+/* @brief	≤È’“—ß…˙
+ * @param	ProductID ¥Ã‚∆˜≤˙∆∑ID
+ * @return	≤È’“µΩµƒ—ß…˙∂‘œÛ£¨Œ¥’“µΩ∑µªÿ NULL
+ */
 Stu* Students::Find(BYTE* ProductID)
 {
 	Stu* now = head;
@@ -67,11 +80,12 @@ Stu* Students::Find(BYTE* ProductID)
 		if(now->isMyProduct(ProductID))
 			return now;
 	}
-	return 0;
+	return NULL;
 }
+/* @brief	ø™ º“ªµ¿–¬Ã‚ƒøµƒ¥Ã‚
+ */
 void Students::Start()
 {
-
 	this->isStarted = true;
 	this->QuesTotal++;
 	Stu* temp = head;
@@ -92,7 +106,12 @@ void Students::Start()
 		temp->ansTime = 0;
 	}
 }
-void Students::USBAddCorAnswer(BYTE ANS)
+/* @brief	ÃÌº”’˝»∑¥∞∏
+ * @param	ANS ¥∞∏£®1◊÷Ω⁄£©
+ * @note	»Áπ˚≤ª‘⁄¥Ã‚ ±º‰£¨‘ÚÃÌº”µƒ¥∞∏ «…œ“ªÃ‚µƒ
+ * @return	 «∑ÒÃÌº”≥…π¶£®»Áπ˚≤ª‘⁄¥Ã‚ ±º‰«“ ˝æ›ø‚∑√Œ  ß∞‹‘Ú”–ø…ƒ‹ ß∞‹£©
+ */
+bool Students::USBAddCorAnswer(BYTE ANS)
 {
 	m_Lock.Lock();
 	
@@ -100,16 +119,24 @@ void Students::USBAddCorAnswer(BYTE ANS)
 		this->CorAnswer.ansTime = 0;
 	
 	m_Lock.Unlock();
+	if (!isStarted) //±£¥Ê…œ“ªÃ‚µƒ’˝»∑¥∞∏
+		return Sto.saveCorAnswer(this);
+	else
+		return true;
 }
-int Students::USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime)
+/* @brief	—ß…˙¥Ã‚
+ * @param	ProductID ≤˙∆∑ID
+ * @param	ANS	¥∞∏£®1◊÷Ω⁄£©
+ * @param	ansTime ¥Ã‚ ±º‰£®¥”ø™ º¥Ã‚À„∆µƒ√Î ˝£©
+ * @return	 «∑ÒÃÌº”≥…π¶£¨»Áπ˚ ProductID ≤ª‘⁄¡–±Ì÷–‘Ú≤ª≥…π¶
+ * @note	ƒ‰√˚¥Ã‚∆˜‘⁄µ˜”√¥À∫Ø ˝¥Ã‚«∞£¨±ÿ–ÎÕ®π˝ USBRegister «©µΩ
+ */
+bool Students::USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime)
 {
-	//if (!this->isStarted)
-//		return -1;
 	Stu *now = Find(ProductID);
 	if(now!=NULL)
 	{
-		
-		if(now->Ans==0)
+		if(now->Ans==0) //  ◊¥Œªÿ¥¥ÀÃ‚
 		{
 			m_Lock.Lock();
 	
@@ -117,40 +144,45 @@ int Students::USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime)
 			
 			m_Lock.Unlock();
 		}
-		if(!now->IsAtClass)
+		if(!now->IsAtClass) // »Áπ˚ªπ√ª«©µΩ£¨œ»«©µΩ
 		{
 			m_Lock.Lock();
 			
 				StuAtClass++;
+				now->IsAtClass = true;
 
 			m_Lock.Unlock();
-			now->IsAtClass = true;
 		}
-		if(now->Ans!=ANS)
+		if(now->Ans!=ANS) // –ﬁ∏ƒ¥ÀÃ‚¥∞∏
 		{
 			m_Lock.Lock();
 	
 				AnswerCount[now->Ans]--;
 				AnswerCount[ANS]++;
+				now->Ans = ANS;
 			
-			m_Lock.Unlock();
-			now->Ans = ANS;
+			m_Lock.Unlock();		
 		}
-		now->ansTime = ansTime;	
-		
-		return 1;
+		now->ansTime = ansTime;
+		return true;
 	}
-	else
-	{
-		return 0;
-	}
+	else return false;
 }
-bool Students::End(void) // »Ù∑¢ÀÕµΩ∑˛ŒÒ∆˜‘Ú∑µªÿ1£¨»Ù±£¥ÊµΩU≈Ã‘Ú∑µªÿ0
+/* @brief	Ω· ¯¥Ã‚
+ * @return  »Ù∑¢ÀÕµΩ∑˛ŒÒ∆˜‘Ú∑µªÿ1£¨»Ù±£¥ÊµΩU≈Ã‘Ú∑µªÿ0
+ */
+bool Students::End(void) 
 {
 	this->isStarted = false;
+	Sto.saveAnswers(this);
 	return 0;
 }
-bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //∑µªÿ 1 ±Ì æ‘≠”–£¨∑µªÿ 0 ±Ì æ–¬‘ˆ
+/* @brief	—ß…˙£®¥Ã‚∆˜£©«©µΩ
+ * @param	ID —ß∫≈
+ * @param	ProductID ≤˙∆∑ID
+ * @return	 «∑Ò‘⁄√˚µ•÷–£¨»Áπ˚≤ª‘⁄√˚µ•÷–‘Úƒ‰√˚«©µΩ
+ */
+bool Students::USBRegister(BYTE* ID,BYTE* ProductID)
 {
 	Stu* now;
 	StuStatic* ListTemp;
@@ -158,13 +190,10 @@ bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //∑µªÿ 1 ±Ì æ‘≠”–£¨∑µªÿ 0 ±
 	if((now = Find(ProductID))==NULL)
 	{
 		if(ListTemp==NULL)
-		{
-			Add(ID,ProductID,_T("ƒ‰√˚"));
-		}
+			now = Add(ID,ProductID,_T("ƒ‰√˚"));
 		else
-		{
-			Add(ID,ProductID,ListTemp->Name);
-		}
+			now = Add(ID,ProductID,ListTemp->Name);
+		Sto.stuRegister(now);
 		return false;
 	}
 	else
@@ -172,9 +201,7 @@ bool Students::USBRegister(BYTE* ID,BYTE* ProductID) //∑µªÿ 1 ±Ì æ‘≠”–£¨∑µªÿ 0 ±
 		for(int i =0;i< ID_LENGTH;i++)
 			now->ID[i] = ID[i];
 		if(ListTemp==NULL)
-		{
 			now->Name = _T("ƒ‰√˚");
-		}
 		else
 			now->Name = ListTemp->Name;
 		return true;

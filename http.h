@@ -6,7 +6,7 @@
 class CloudConn
 {
 protected:
-	CInternetSession session;
+	CInternetSession *session;
 	CHttpConnection *conn;
 	CHttpFile *file;
 	CString postData;

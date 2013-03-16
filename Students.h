@@ -136,11 +136,11 @@ public: //答题基本情况
 	BYTE AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
 public: //答题操作
 	void Start(); //开始答题
-	bool End(); //结束答题，若发送到服务器则返回1，若保存到U盘则返回0
-	int USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime); //添加答案，返回 1 表示原有，返回 0 表示新增，返回 -1 表示不在答题时间
-	void USBAddCorAnswer(BYTE ANS);//添加正确答案
-public: //注册操作
-	bool USBRegister(BYTE* ID,BYTE* ProductID); //注册到课堂
+	bool End(); //结束答题
+	bool USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime); //学生答题
+	bool USBAddCorAnswer(BYTE ANS);//添加正确答案
+public: //签到操作
+	bool USBRegister(BYTE* ID,BYTE* ProductID); //学生（答题器）签到
 };
 
 extern Students allStu;

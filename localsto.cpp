@@ -1,17 +1,28 @@
 #include "stdafx.h"
 #include "localsto.h"
 
+LocalSto Sto;
+
+static char* addslashesForSpace(char* str);
+static char* stripslashesForSpace(char* str, char** newstr);
+static long toLong(BYTE* s, int count);
+static BYTE* toBytes(long num, int count);
+
 LocalSto::LocalSto()
 {
 	if (SQLITE_OK != sqlite3_open("test.db", &dbconn)) {
 		Error(E_FATAL, _T("无法打开数据库"));
 		return;
 	}
-	if (SQLITE_OK != this->query(".read initdb.sql")) {
-		Error(E_NOTICE, _T("找不到数据库初始化文件，无法初始化数据库"));
+	if (!this->initDbFile()) {
+		Error(E_FATAL, _T("无法初始化数据库结构"));
+		return;
 	}
 	this->syncFromCloud();
-	this->squery("INSERT INTO lecture (begin_time,synced) VALUES (%ld,0)", time(NULL));
+	if (!this->squery("INSERT INTO lecture (begin_time,synced) VALUES (%ld,0)", time(NULL))) {
+		Error(E_FATAL, _T("数据库初始化课堂信息失败"));
+		return;
+	}
 	this->lectureID = (long)sqlite3_last_insert_rowid(this->dbconn);
 }
 LocalSto::~LocalSto()
@@ -21,26 +32,14 @@ LocalSto::~LocalSto()
 		Error(E_WARNING, _T("无法正常关闭数据库"));
 	}
 }
-static long toLong(BYTE* s, int count)
-{
-	long l = 0;
-	for (int i=0; i<count; i++)
-		l = (l<<8) + s[i];
-	return l;
-}
-static BYTE* toBytes(long num, int count)
-{
-	BYTE *buf = (BYTE*)malloc(count);
-	for (int i=count-1; i>=0; i--) {
-		buf[i] = num & 0xFF;
-		num>>=8;
-	}
-	return buf;
-}
-bool LocalSto::save(Students *s)
+/* @brief	保存一道题的答题信息
+ * @param	s 课堂对象
+ * @return	是否保存成功
+ */
+bool LocalSto::saveAnswers(Students *s)
 {
 	long currTime = (long)time(NULL);
-	this->insert("problem", "lecture,problem,begin_time,end_time,corrent_ans",
+	this->insert("problem", "lecture,problem,begin_time,end_time,correct_ans",
 		this->lectureID, s->QuesTotal, s->beginTime, currTime, s->CorAnswer.Ans);
 	Stu* stu = s->head;
 	bool success = true;
@@ -49,16 +48,32 @@ bool LocalSto::save(Students *s)
 			this->lectureID, s->QuesTotal, toLong(stu->ProductID,4), stu->Ans, stu->ansTime))
 			success = false;
 	}
+	if (success)
+		this->uploadToCloud();
 	return success;
 }
+/* @brief	保存正确答案
+ * @param	s 课堂对象
+ * @return	是否保存成功
+ * @note	此函数只能在A题答题结束，B题尚未开始时调用，保存A题的正确答案
+ */
+bool LocalSto::saveCorAnswer(Students *s)
+{
+	return this->squery("UPDATE problem SET correct_ans=%d WHERE lecture=%d AND problem=%d", s->CorAnswer.Ans, this->lectureID, s->QuesTotal);
+}
+/* @brief	保存答题器 ID 与学号的映射
+ * @param	ID 学号
+ * @param	ProductID 答题器ID
+ * @return	是否保存成功
+ */
 bool LocalSto::stuRegister(Stu* stu)
 {
 	return this->squery("REPLACE INTO product (product_id,student_id) VALUES ('%ld','%ld')", toLong((BYTE *)(LPCTSTR)stu->ProductID, 4), toLong((BYTE *)stu->ID, 5));
 }
-
-char* addslashesForSpace(char* str);
-char* stripslashesForSpace(char* str, char** newstr);
-
+/* @brief	将数据库查询结果表示成字符串
+ * @param	sql 数据库查询
+ * @return	查询结构
+ */
 CString LocalSto::rowsToStr(const char* sql)
 {
 	CString str;
@@ -68,14 +83,17 @@ CString LocalSto::rowsToStr(const char* sql)
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
 		for (int i=0; i<col_count; i++) {
 			if (i>0)
-				str += CString(_T("\t"));
+				str += CString(L"\t");
 			str += CString(addslashesForSpace((char *)sqlite3_column_text(stmt, i)));
 		}
-		str += CString(_T("\n"));
+		str += CString(L"\n");
 	}
 	sqlite3_finalize(stmt);
 	return str;
 }
+/* @brief	将本地数据库的学生签到信息和答题信息上传到云端
+ * @return	是否上传成功
+ */
 bool LocalSto::uploadToCloud()
 {
 	CString data;
@@ -93,8 +111,7 @@ bool LocalSto::uploadToCloud()
 	cloud->SetBody(CString(L"data"), data);
 	CString response = cloud->send();
 	if (response == "OK") {
-		this->query("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; UPDATE lecture SET synced=1");
-		return true;
+		return this->query("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; UPDATE lecture SET synced=1");
 	}
 	if (response == "FAIL")
 		Error(E_WARNING, _T("上传到云端过程中内部错误"));
@@ -102,6 +119,63 @@ bool LocalSto::uploadToCloud()
 		Error(E_NOTICE, _T("无法连接到云端"));
 	return false;
 }
+bool LocalSto::initDbFile()
+{
+	if (!this->query("CREATE TABLE IF NOT EXISTS student ("
+		"student_id TEXT UNIQUE,"
+		"name TEXT)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS product ("
+		"product_id INTEGER UNIQUE,"
+		"student_id INTEGER)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS lecture ("
+		"id INTEGER PRIMARY KEY,"
+		"begin_time INTEGER,"
+		"end_time INTEGER,"
+		"synced INTEGER)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS register ("
+		"product INTEGER,"
+		"lecture INTEGER,"
+		"reg_time INTEGER)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS problem ("
+		"lecture INTEGER,"
+		"problem INTEGER,"
+		"begin_time INTEGER,"
+		"end_time INTEGER,"
+		"correct_ans INTEGER)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS answer ("
+		"lecture INTEGER,"
+		"problem INTEGER,"
+		"product INTEGER,"
+		"ans INTEGER,"
+		"ans_time INTEGER)"))
+		return false;
+	return true;
+	/*
+	HRSRC hRes = FindResource(0, MAKEINTRESOURCE(IDR_SQL1), L"SQL");
+	if (NULL != hRes) {
+		HGLOBAL hData = LoadResource(0, hRes);
+		if(NULL != hData) {
+			DWORD dataSize = SizeofResource(0, hRes);
+			char* data = (char*)LockResource(hData);
+			if (this->query(data))
+				return true;
+			Error(E_FATAL, L"无法初始化数据库");
+			return false;
+		}
+    }
+	Error(E_FATAL, L"找不到数据库初始化资源文件");
+	return false;
+	*/
+}
+
+/* @brief	从云端下载学生姓名信息
+ * @return	是否下载成功
+ */
 bool LocalSto::syncFromCloud()
 {
 	CloudConn *cloud = new CloudConn("sync");
@@ -129,6 +203,10 @@ bool LocalSto::syncFromCloud()
 	}
 	return true;
 }
+/* @brief	用本地数据库的学生姓名信息初始化内存数据结构
+ * @param	m_List 学生姓名表
+ * @return	是否成功
+ */
 bool LocalSto::initStuNames(StuStaticList* m_List)
 {
 	sqlite3_stmt *stmt = NULL;
@@ -142,7 +220,23 @@ bool LocalSto::initStuNames(StuStaticList* m_List)
 	return true;
 }
 
-// 下面是私有函数
+//========== 下面是私有函数 ==========
+static long toLong(BYTE* s, int count)
+{
+	long l = 0;
+	for (int i=0; i<count; i++)
+		l = (l<<8) + s[i];
+	return l;
+}
+static BYTE* toBytes(long num, int count)
+{
+	BYTE *buf = (BYTE*)malloc(count);
+	for (int i=count-1; i>=0; i--) {
+		buf[i] = num & 0xFF;
+		num>>=8;
+	}
+	return buf;
+}
 static char* addslashes(char* str)
 {
 	char *newstr = (char *)malloc(strlen(str)*2+1);

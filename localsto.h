@@ -16,13 +16,15 @@ protected:
 public:
 	LocalSto();
 	~LocalSto();
-	bool save(Students* s);     //保存一次答题信息到本地
-	bool stuRegister(Stu* stu); //学生注册
-	bool uploadToCloud();       //上传答题信息到云端
-	bool syncFromCloud();       //从云端同步学生姓名
+	bool saveAnswers(Students* s);            //保存一道题的答题信息
+	bool saveCorAnswer(Students* s);		  //保存正确答案
+	bool stuRegister(Stu* stu);               //学生签到
 	bool initStuNames(StuStaticList* m_List); //初始化学生姓名数据结构
 protected:
 	CString rowsToStr(const char* sql); // 将查询结果序列化出来
+	bool initDbFile();			//初始化数据库文件
+	bool uploadToCloud();       //上传答题信息到云端，save 时会自动调用
+	bool syncFromCloud();       //从云端同步学生姓名，实例化时会自动调用
 protected:
 	bool insert(const char* table, const char* fields, char* data1, ...); // 插入字符串数据
 	bool insert(const char* table, const char* fields, long data1, ...); // 插入整型数据
@@ -33,3 +35,5 @@ protected:
 	bool squery(const char* pattern, ...); // query与sprintf的结合
 	bool query(const char* sql, int (*callback)(void*,int,char**,char**), void* argtocallback); // 原生数据库查询
 };
+
+extern LocalSto Sto;

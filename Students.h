@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include "afxmt.h"
+#include "localsto.h"
 /******************************************文件说明*****************************************
 Students.h 以及 Students.cpp 主要用于存储学生答题
 结构体 Answer 存储一个答案
@@ -26,121 +27,81 @@ allStu 为整个工程的全局变量
 
 ********************************************文件说明****************************************/
 
-#define ID_LENGTH 5
-#define PID_LENGTH 4
-
 class StuStatic
 {
 public:
-	StuStatic(CString Name1,BYTE* ID1)
-	{
-		Name = Name1;
-		for(int i=0;i<ID_LENGTH;i++)
-			ID[i] = ID1[i];
-		next = NULL;
-	}
-	StuStatic()
-	{
-		next = NULL;
-	}
-	~StuStatic(void)
-	{
-		
-	}
-public:
-	CString Name;
-	BYTE ID[5];
+	CString Name;		//姓名
+	CString StudentId;	//学号
+	CString NumericId;	//数字学号
 	StuStatic* next;
-	bool isMe(BYTE* ID1)//输入ID是否一样,用于查找
-	{
-		
-		for(int i = 0; i<ID_LENGTH; i++)
-		if (ID1[i] != this->ID[i])
-			return false;
-			return true;
-	}
+public:
+	StuStatic(void);
+	StuStatic(CString Name, CString StudentID, CString NumericId);
+	~StuStatic(void);
 };
+
 class StuStaticList
 {
 public:
-	StuStaticList()
-	{
-		StaticList = new StuStatic();
-	}
-	~StuStaticList()
-	{
-		while (this->StaticList != NULL)
-		{
-			StuStatic *temp = this->StaticList;
-			this->StaticList = temp->next;
-			delete temp;
-		}
-	}
+	StuStatic* head;
+public: //查找学生
+	StuStatic* FindByStudentId(CString StudentId);
+	StuStatic* FindByNumericId(CString NumericId);
+public: //添加学生
+	StuStatic* Add(CString Name, CString StudentId, CString NumericId);
 public:
-	StuStatic* StaticList;
-	void NewStuStatic(CString Name,BYTE* ID)
-	{
-		StuStatic* now = new StuStatic(Name,ID);
-		now->next = StaticList->next;
-		StaticList->next = now;
-	}
-	StuStatic* FindStu(BYTE* ID1)
-	{
-		StuStatic* temp = StaticList;
-		while((temp = temp->next)!=NULL)
-		{
-			if(temp->isMe(ID1))
-				return temp;
-		}
-		return 0;
-	}
+	StuStaticList(void);
+	~StuStaticList(void);
 };
 
 class Stu
 {
+public:
+	StuStatic* Info;		//学生静态信息
+	long ProductId;		//答题器ID
+	Stu* next;			//学生链表下一元素
+public: // 学生作答信息
+	BYTE Ans;			//最近一次作答的答案
+	unsigned int AnsTime; //最近一次答题所需时间
+	bool IsAtClass;		//是否在课堂上
 public: 
-	Stu(void);
-	Stu(BYTE* ID1,BYTE* ProductID1,CString Name1);
+	Stu(long ProductId);
 	~Stu(void);
-	Stu* next; //学生链表下一元素
-
-public: //一个学生的基本信息
-	BYTE ID[5];//学生学号用5个BYTE表示
-	BYTE ProductID[4];//学生注册时的产品ID Product ID
-	CString Name;//学生的名字
-	BYTE Ans;//当Ans为0时表示没有作答
-	unsigned int ansTime;//答题所需要的时间
-	bool IsAtClass;
-	bool isMyProduct(BYTE* ProductID1);//输入ProductID是否一样，用于查找
 };
 
 class Students
 {
+	friend class LocalSto;
 public:
-	Students(void);
+	CString course;			//班级编号
+	LocalSto* Sto;			//数据库连接
+	Stu* head;				//学生链表
+	StuStaticList InfoList;	//学生静态信息链表
+	unsigned int beginTime;	//开始时间
+	BYTE CorAnswer;			//最近一次正确答案
+	int QuesTotal;			//题目总数
+	int StudTotal;			//学生总数
+	int StuAtClass;			//到位的学生总数
+	int StuAlreadyAns;		//已经答题的学生数目
+	bool isStarted;			//是否处于答题状态
+	unsigned int AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
+public: //选定班级后实例化
+	Students(CString course);
 	~Students(void);
-public: //数据
-	Stu* head; //学生链表
-	long beginTime;//开始时间
-	Stu CorAnswer;//存储正确答案
-	StuStaticList m_List;//静态名单
-public: //学生操作
-	Stu* Add(BYTE* ID,BYTE* ProductID, CString Name);//添加学生
-	Stu* Find(BYTE* ProductID);//查找学生
-public: //答题基本情况
-	int QuesTotal;//题目总数,显示所需要的数据
-	int StudTotal;//学生总数，显示所需要的数据
-	int StuAtClass;//到位的学生总数，显示所需要的数据
-	int StuAlreadyAns;//已经答题的学生数目，显示所需要的数据
-	bool isStarted;//是否处于答题状态，显示所需要的数据
-	BYTE AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
-public: //答题操作
+public: //鼠标操作
 	void Start(); //开始答题
 	bool End(); //结束答题
-	bool USBAddAnswer(BYTE* ProductID, BYTE ANS, unsigned int ansTime); //学生答题
-	bool USBAddCorAnswer(BYTE ANS);//添加正确答案
-public: //签到操作
-	bool USBRegister(BYTE* ID,BYTE* ProductID); //学生（答题器）签到
+public: //答题器接口操作
+	bool AddAnswer(long ProductId, BYTE ANS, unsigned int AnsTime); //学生答题
+	bool AddCorAnswer(BYTE ANS);   //添加正确答案
+	bool Register(long ProductId); //答题器签到
+	bool SetNumericId(CString NumericId, long ProductId); //答题器设置学号
+public: //从数据库初始化
+	bool Add(CString NumericId, long ProductId);
+private:
+	bool SetInfoByNumericId(Stu* now, CString NumericId);
+	Stu* AddAnonymous(long ProductId);
+	Stu* FindByProductId(long ProductId);
 };
 
 extern Students allStu;

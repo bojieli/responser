@@ -3,7 +3,7 @@
 	numeric_id TEXT,
 	name TEXT
 );
-CREATE TABLE IF NOT EXISTS course ( -- 一门课，永久保存，course_id 和 name 从云端下载，lecture_count 本地读
+CREATE TABLE IF NOT EXISTS course ( -- 一门课，永久保存，从云端同步，lecture_count 上传
 	course_id TEXT UNIQUE,
 	name TEXT,
 	lecture_count INTEGER

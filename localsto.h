@@ -4,6 +4,7 @@
 #include "sqlite3.h"
 #include "Students.h"
 #include "http.h"
+#include "baseStation.h"
 
 #define SQL_MAXLEN 512
 

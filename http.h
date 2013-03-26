@@ -14,5 +14,6 @@ public:
 	CloudConn(const char* path);
 	~CloudConn();
 	void SetBody(CString key, CString value);
+	void RawBody(CString str);
 	CString send();
 };

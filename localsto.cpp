@@ -116,8 +116,9 @@ CString LocalSto::rowsToStr(const char* sql)
  */
 bool LocalSto::uploadToCloud()
 {
-	CString data;
-	data += this->rowsToStr("SELECT course_id,lecture_count FROM course");
+	CString data = baseStation.Id() + "\n";
+
+	data += this->rowsToStr("SELECT id,lecture_count FROM course");
 	data += "\n";
 	data += this->rowsToStr("SELECT product_id,numeric_id FROM product");
 	data += "\n";
@@ -130,7 +131,7 @@ bool LocalSto::uploadToCloud()
 	data += this->rowsToStr("SELECT course,lecture,problem,product,ans,ans_time FROM answer");
 
 	CloudConn *cloud = new CloudConn("upload");
-	cloud->SetBody(CString(L"data"), data);
+	cloud->RawBody(data);
 	CString response = cloud->send();
 	if (response == "OK") {
 		return this->query("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; DELETE FROM lecture");
@@ -143,15 +144,17 @@ bool LocalSto::uploadToCloud()
 }
 bool LocalSto::initDbFile()
 {
-	if (!this->query("CREATE TABLE IF NOT EXISTS student ("
-		"student_id TEXT UNIQUE,"
-		"numeric_id TEXT,"
-		"name TEXT)"))
-		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS course ("
+		"id INTEGER UNIQUE,"
 		"course_id TEXT UNIQUE,"
 		"name TEXT,"
 		"lecture_count INTEGER)"))
+		return false;
+	if (!this->query("CREATE TABLE IF NOT EXISTS student ("
+		"course INTEGER,"
+		"student_id TEXT UNIQUE,"
+		"numeric_id TEXT,"
+		"name TEXT)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS product ("
 		"product_id INTEGER UNIQUE,"
@@ -221,9 +224,9 @@ bool LocalSto::syncFromCloud()
 		Error(E_NOTICE, L"无法连接到云端");
 		return false;
 	}
-	response = this->loadDataInStr("student", "course,student_id,numeric_id,name", 4, response);
+	response = this->loadDataInStr("course", "id,course_id,name,lecture_count", 3, response);
 	ASSERT_CHAR(response, '\n');
-	response = this->loadDataInStr("course", "course_id,name,lecture_count", 3, response);
+	response = this->loadDataInStr("student", "course,student_id,numeric_id,name", 4, response);
 	ASSERT_CHAR(response, '\n');
 	response = this->loadDataInStr("product", "product_id,numeric_id", 2, response);
 	return true;

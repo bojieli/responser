@@ -37,6 +37,10 @@ void CloudConn::SetBody(CString key, CString value)
 	postData += CString(_T('='));
 	postData += value;
 }
+void CloudConn::RawBody(CString str)
+{
+	postData = str;
+}
 CString CloudConn::send()
 {
 	DWORD dwRet;

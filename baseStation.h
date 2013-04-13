@@ -1,6 +1,7 @@
+#pragma once
+
 class BaseStation {
 public:
-	CString Id();
+	UINT ID();
+	CString token();
 };
-
-extern BaseStation baseStation;

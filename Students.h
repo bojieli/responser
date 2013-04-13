@@ -1,7 +1,3 @@
-#pragma once
-#include "stdafx.h"
-#include "afxmt.h"
-#include "localsto.h"
 /******************************************文件说明*****************************************
 Students.h 以及 Students.cpp 主要用于存储学生答题
 结构体 Answer 存储一个答案
@@ -25,7 +21,38 @@ allStu 为整个工程的全局变量
 3、增加一种即席模式，也就是不需要任何注册就能凭借ID答题。
 平时当老师不允许注册时，是不会有新的学生加入的。
 
+
+allStu提供给外部的接口函数如下：
+针对StuStatic m_List,它只需要在老师选择完班级之后添加即可，因此只有一个接口
+allStu.m_List.NewStuStatic()
+
+public: //答题操作
+	void Start(); //开始答题
+	bool End(); //结束答题，若发送到服务器则返回1，若保存到U盘则返回0
+
+	int USBAddAnswer(BYTE* ProductID, BYTE ANS, UINT ansTime); 
+	在答题模式和课前模式中使用，在开启课前模式时调用开始答题，来判断哪些学生已经到了
+
+	void USBAddCorAnswer(BYTE ANS);//添加正确答案，教师笔或者按键提供
+public: //注册操作
+	bool USBRegister(BYTE* ID,BYTE* ProductID); //注册到课堂
+
+
+用到的数据接口
+public: //答题基本情况
+	int QuesTotal;//题目总数,显示所需要的数据
+	int StudTotal;//学生总数，显示所需要的数据
+	int StuAtClass;//到位的学生总数，显示所需要的数据
+	int StuAlreadyAns;//已经答题的学生数目，显示所需要的数据
+	bool isStarted;//是否处于答题状态，显示所需要的数据
+	BYTE AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
+
 ********************************************文件说明****************************************/
+
+#pragma once
+#include "stdafx.h"
+#include "afxmt.h"
+#include "localsto.h"
 
 class StuStatic
 {
@@ -58,14 +85,14 @@ class Stu
 {
 public:
 	StuStatic* Info;		//学生静态信息
-	long ProductId;		//答题器ID
-	Stu* next;			//学生链表下一元素
+	UINT ProductId;	//答题器ID
+	Stu* next;				//学生链表下一元素
 public: // 学生作答信息
-	BYTE Ans;			//最近一次作答的答案
-	unsigned int AnsTime; //最近一次答题所需时间
-	bool IsAtClass;		//是否在课堂上
+	BYTE Ans;				//最近一次作答的答案
+	UINT AnsTime;	//最近一次答题所需时间
+	bool IsAtClass;			//是否在课堂上
 public: 
-	Stu(long ProductId);
+	Stu(UINT ProductId);
 	~Stu(void);
 };
 
@@ -73,36 +100,38 @@ class Students
 {
 	friend class LocalSto;
 public:
-	CString course;			//班级编号
+	UINT course;			//班级编号
 	LocalSto* Sto;			//数据库连接
 	Stu* head;				//学生链表
 	StuStaticList InfoList;	//学生静态信息链表
-	unsigned int beginTime;	//开始时间
+	UINT beginTime;			//答题开始时间
 	BYTE CorAnswer;			//最近一次正确答案
 	int QuesTotal;			//题目总数
 	int StudTotal;			//学生总数
 	int StuAtClass;			//到位的学生总数
 	int StuAlreadyAns;		//已经答题的学生数目
 	bool isStarted;			//是否处于答题状态
-	unsigned int AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
+	UINT AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
 public: //选定班级后实例化
-	Students(CString course);
+	Students(LocalSto* sto, UINT course);
 	~Students(void);
 public: //鼠标操作
 	void Start(); //开始答题
 	bool End(); //结束答题
 public: //答题器接口操作
-	bool AddAnswer(long ProductId, BYTE ANS, unsigned int AnsTime); //学生答题
-	bool AddCorAnswer(BYTE ANS);   //添加正确答案
-	bool Register(long ProductId); //答题器签到
-	bool SetNumericId(CString NumericId, long ProductId); //答题器设置学号
+	bool USBAddAnswer(UINT ProductId, BYTE ANS); // USB答题和签到
+	bool USBAddCorAnswer(BYTE ANS); //添加正确答案
+	bool Register(CString NumericId, UINT ProductId); //答题器设置学号，注册模式
 public: //从数据库初始化
-	bool Add(CString NumericId, long ProductId);
+	bool Add(CString NumericId, UINT ProductId);
+public: //遍历学生
+	void each(void callback(Stu* stu));
+	void each(void callback(UINT ProductId, CString Name, CString StudentId));
 private:
+	bool AddAnswer(UINT ProductId, BYTE ANS, UINT AnsTime); //学生答题
+	bool AddCorAnswer(BYTE ANS); //添加正确答案
+	bool SignIn(UINT ProductId); //答题器签到
 	bool SetInfoByNumericId(Stu* now, CString NumericId);
-	Stu* AddAnonymous(long ProductId);
-	Stu* FindByProductId(long ProductId);
+	Stu* AddAnonymous(UINT ProductId);
+	Stu* FindByProductId(UINT ProductId);
 };
-
-extern Students allStu;
-extern CCriticalSection m_Lock;//线程同步

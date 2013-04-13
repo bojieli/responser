@@ -4,12 +4,16 @@
 static char* addslashes(char* str);
 static char* addslashesForSpace(char* str);
 static char* stripslashesForSpace(char* str, char** newstr);
-static long toLong(BYTE* s, int count);
-static BYTE* toBytes(long num, int count);
+static UINT toUINT(BYTE* s, int count);
+static BYTE* toBytes(UINT num, int count);
 
-LocalSto::LocalSto(char* course_id)
+/* @brief	本地存储类构造函数
+ * @param	StationID ID
+ */
+LocalSto::LocalSto(UINT StationID, CString StationToken)
 {
-	this->course = addslashes(course_id);
+	this->StationID = StationID;
+	this->StationToken = StationToken;
 	if (SQLITE_OK != sqlite3_open("test.db", &dbconn)) {
 		Error(E_FATAL, _T("无法打开数据库"));
 		return;
@@ -19,16 +23,6 @@ LocalSto::LocalSto(char* course_id)
 		return;
 	}
 	this->syncFromCloud();
-	int lecture_count = atoi(this->selectFirst("SELECT lecture_count FROM course WHERE course_id='%s'", course));
-	if (!this->squery("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id='%s'", course))
-		goto error;
-	if (!this->squery("INSERT INTO lecture (course,id,begin_time) VALUES ('%s',%d,%ld)", course, lecture_count+1, time(NULL)))
-		goto error;
-	this->lectureID = (long)sqlite3_last_insert_rowid(this->dbconn);
-	return;
-error:
-	Error(E_FATAL, _T("数据库初始化课堂信息失败"));
-	return;
 }
 LocalSto::~LocalSto()
 {
@@ -37,22 +31,55 @@ LocalSto::~LocalSto()
 		Error(E_WARNING, _T("无法正常关闭数据库"));
 	}
 }
+/* INTERNAL */
+static int getcourse_callback(void* course, int cols, char** values, char** fields)
+{
+	Courses* c = (Courses*)course;
+	Course* newc = new Course(atoi(values[0]), values[1], values[2]);
+	newc->next = c->head->next;
+	c->head->next = newc;
+	return 0;
+}
+/* @brief	获取所有班级信息
+ * @param	c 放置班级信息的对象
+ * @return	是否获取成功
+ */
+bool LocalSto::getCourses(Courses* c)
+{
+	return this->query("SELECT id, name, info FROM course", getcourse_callback, c);
+}
+/* @brief	设置选中的班级ID，开始一节课
+ * @param	course_id 班级ID字符串
+ * @return	是否初始化成功
+ */
+bool LocalSto::setCourseId(UINT course_id)
+{
+	this->course = course_id;
+	int lecture_count = atoi(this->selectFirst("SELECT lecture_count FROM course WHERE course_id='%s'", course));
+	if (!this->squery("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id='%s'", course))
+		goto error;
+	if (!this->squery("INSERT INTO lecture (course,id,begin_time) VALUES ('%s',%d,%ld)", course, lecture_count+1, time(NULL)))
+		goto error;
+	this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
+	return true;
+error:
+	Error(E_FATAL, _T("数据库初始化课堂信息失败"));
+	return false;
+}
 /* @brief	保存一道题的答题信息
  * @param	s 课堂对象
  * @return	是否保存成功
  */
 bool LocalSto::saveAnswers(Students *s)
 {
-	long currTime = (long)time(NULL);
-	if (!this->squery("INSERT INTO problem (course,lecture,problem,begin_time,end_time,correct_ans) "
-		"VALUES ('%s',%d,%d,%d,%d,%d)",
+	UINT currTime = (UINT)time(NULL);
+	if (!this->insert("problem", "course,lecture,problem,begin_time,end_time,correct_ans",
 		course, lectureID, s->QuesTotal, s->beginTime, currTime, s->CorAnswer))
 		return false;
 	Stu* stu = s->head;
 	bool success = true;
 	while ((stu = stu->next) != NULL) {
-		if (!this->squery("INSERT INTO answer (course,lecture,problem,product,answer,ans_time) "
-			"VALUES ('%s',%d,%d,%d,%d,%d)",
+		if (!this->insert("answer", "course,lecture,problem,product,answer,ans_time",
 			course, lectureID, s->QuesTotal, stu->ProductId, stu->Ans, stu->AnsTime))
 			success = false;
 	}
@@ -67,17 +94,16 @@ bool LocalSto::saveAnswers(Students *s)
  */
 bool LocalSto::saveCorAnswer(Students *s)
 {
-	return this->squery("UPDATE problem SET correct_ans=%d WHERE course='%s' AND lecture=%d AND problem=%d",
+	return this->squery("UPDATE problem SET correct_ans=%d WHERE course=%d AND lecture=%d AND problem=%d",
 		course, s->CorAnswer, lectureID, s->QuesTotal);
 }
 /* @brief	学生签到
  * @param	ProductId 产品ID
  * @return	是否保存成功
  */
-bool LocalSto::stuRegister(long ProductId)
+bool LocalSto::stuSignIn(UINT ProductId)
 {
-	return this->squery("INSERT INTO register (course,lecture,product,reg_time)"
-		"VALUES ('%s',%d,%d,%d)",
+	return this->insert("register", "course,lecture,product,reg_time",
 		course, lectureID, ProductId, time(NULL));
 }
 /* @brief	保存学生设置的学号
@@ -85,7 +111,7 @@ bool LocalSto::stuRegister(long ProductId)
  * @param	ProductId 产品ID
  * @return	是否保存成功
  */
-bool LocalSto::setNumericId(CString NumericId, long ProductId)
+bool LocalSto::setNumericId(CString NumericId, UINT ProductId)
 {
 	return this->squery("REPLACE INTO product (product_id,numeric_id) VALUES ('%ld','%s')",
 		ProductId, (LPCTSTR)NumericId);
@@ -111,14 +137,36 @@ CString LocalSto::rowsToStr(const char* sql)
 	sqlite3_finalize(stmt);
 	return str;
 }
+/* @brief	添加课程
+ * @param	name 课程名称
+ * @param	info 课程描述
+ */
+bool LocalSto::addCourse(CString name, CString info)
+{
+	if (!insert("course", "name,info", (LPSTR)(LPCTSTR)name, (LPSTR)(LPCTSTR)info)) {		
+		Error(E_FATAL, _T("无法保存课程到本地数据库"));
+		return false;
+	}
+	sqlite3_int64 course_id = sqlite3_last_insert_rowid(dbconn);
+	CString data;
+	data.Format(L"%u\n", course_id);
+	data += name + "\n" + info + "\n";
+	CloudConn *cloud = new CloudConn("add-course");
+	cloud->RawBody(data);
+	CString response = cloud->send(StationID, StationToken);
+	if (response != "OK") {
+		Error(E_NOTICE, _T("无法保存课程到服务器"));
+		return false;
+	}
+	return true;
+}
 /* @brief	将本地数据库的学生签到信息和答题信息上传到云端
  * @return	是否上传成功
  */
 bool LocalSto::uploadToCloud()
 {
-	CString data = baseStation.Id() + "\n";
-
-	data += this->rowsToStr("SELECT id,lecture_count FROM course");
+	CString data;
+	data = this->rowsToStr("SELECT id,lecture_count FROM course");
 	data += "\n";
 	data += this->rowsToStr("SELECT product_id,numeric_id FROM product");
 	data += "\n";
@@ -132,7 +180,7 @@ bool LocalSto::uploadToCloud()
 
 	CloudConn *cloud = new CloudConn("upload");
 	cloud->RawBody(data);
-	CString response = cloud->send();
+	CString response = cloud->send(StationID, StationToken);
 	if (response == "OK") {
 		return this->query("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; DELETE FROM lecture");
 	}
@@ -145,10 +193,11 @@ bool LocalSto::uploadToCloud()
 bool LocalSto::initDbFile()
 {
 	if (!this->query("CREATE TABLE IF NOT EXISTS course ("
-		"id INTEGER UNIQUE,"
+		"id INTEGER PRIMARY KEY,"
 		"course_id TEXT UNIQUE,"
 		"name TEXT,"
-		"lecture_count INTEGER)"))
+		"lecture_count INTEGER,"
+		"info TEXT)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS student ("
 		"course INTEGER,"
@@ -161,19 +210,19 @@ bool LocalSto::initDbFile()
 		"numeric_id TEXT)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS lecture ("
-		"course TEXT,"
+		"course INTEGER,"
 		"id INTEGER,"
 		"begin_time INTEGER,"
 		"end_time INTEGER)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS register ("
-		"course TEXT,"
+		"course INTEGER,"
 		"lecture INTEGER,"
 		"product INTEGER,"
 		"reg_time INTEGER)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS problem ("
-		"course TEXT,"
+		"course INTEGER,"
 		"lecture INTEGER,"
 		"problem INTEGER,"
 		"begin_time INTEGER,"
@@ -181,7 +230,7 @@ bool LocalSto::initDbFile()
 		"correct_ans INTEGER)"))
 		return false;
 	if (!this->query("CREATE TABLE IF NOT EXISTS answer ("
-		"course TEXT,"
+		"course INTEGER,"
 		"lecture INTEGER,"
 		"problem INTEGER,"
 		"product INTEGER,"
@@ -219,12 +268,12 @@ bool LocalSto::initDbFile()
 bool LocalSto::syncFromCloud()
 {
 	CloudConn *cloud = new CloudConn("sync");
-	char *response = (LPSTR)(LPCTSTR)cloud->send();
+	char *response = (LPSTR)(LPCTSTR)cloud->send(StationID, StationToken);
 	if (response == NULL || *response == '\0') {
 		Error(E_NOTICE, L"无法连接到云端");
 		return false;
 	}
-	response = this->loadDataInStr("course", "id,course_id,name,lecture_count", 3, response);
+	response = this->loadDataInStr("course", "id,course_id,name,lecture_count,info", 5, response);
 	ASSERT_CHAR(response, '\n');
 	response = this->loadDataInStr("student", "course,student_id,numeric_id,name", 4, response);
 	ASSERT_CHAR(response, '\n');
@@ -288,14 +337,14 @@ bool LocalSto::initStuNames(Students* s)
 }
 
 //========== 下面是私有函数 ==========
-static long toLong(BYTE* s, int count)
+static UINT toUINT(BYTE* s, int count)
 {
-	long l = 0;
+	UINT l = 0;
 	for (int i=0; i<count; i++)
 		l = (l<<8) + s[i];
 	return l;
 }
-static BYTE* toBytes(long num, int count)
+static BYTE* toBytes(UINT num, int count)
 {
 	BYTE *buf = (BYTE*)malloc(count);
 	for (int i=count-1; i>=0; i--) {
@@ -424,14 +473,14 @@ bool LocalSto::insert(const char* table, const char* fields, char* data1, ...)
 	sql += CString(")");
 	return this->query((LPCSTR)(LPCTSTR)sql);
 }
-bool LocalSto::insert(const char* table, const char* fields, long data1, ...)
+bool LocalSto::insert(const char* table, const char* fields, UINT data1, ...)
 {
 	CString sql;
 	sql.Format(L"INSERT INTO %s (%s) VALUES (", table, fields);
 	va_list args;
 	va_start(args, data1);
 	bool isFirst = true;
-	while (long data = va_arg(args, long)) {
+	while (UINT data = va_arg(args, UINT)) {
 		if (isFirst)
 			isFirst = false;
 		else

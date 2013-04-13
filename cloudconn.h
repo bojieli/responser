@@ -3,6 +3,9 @@
 #include "stdafx.h"
 #include <afxinet.h>
 
+#define PROTOCOL_VERSION "1.0"
+#define USER_AGENT "responser/" PROTOCOL_VERSION
+
 class CloudConn
 {
 protected:
@@ -15,5 +18,5 @@ public:
 	~CloudConn();
 	void SetBody(CString key, CString value);
 	void RawBody(CString str);
-	CString send();
+	CString send(UINT StationId, CString StationToken);
 };

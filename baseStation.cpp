@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include "baseStation.h"
 
-CString BaseStation::Id() {
-	return CString(L"deadbeef");
+UINT BaseStation::ID() {
+	return 0xdeadbeef;
 }
-
-BaseStation baseStation;
+CString BaseStation::token() {
+	return CString(L"helloworld");
+}

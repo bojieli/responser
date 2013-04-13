@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "http.h"
+#include "cloudconn.h"
 
 CloudConn::CloudConn(const char* path)
 {
@@ -41,11 +41,13 @@ void CloudConn::RawBody(CString str)
 {
 	postData = str;
 }
-CString CloudConn::send()
+CString CloudConn::send(UINT StationID, CString StationToken)
 {
 	DWORD dwRet;
 	try {
-		file->SendRequest(NULL, 0, (LPVOID)(LPCTSTR)postData, postData.GetLength());
+		CString header;
+		header.Format(L"User-Agent: %s\r\nStation-ID: %u\r\nStation-Token: %s\r\n", USER_AGENT, StationID, StationToken);
+		file->SendRequest(header, header.GetLength(), (LPVOID)(LPCTSTR)postData, postData.GetLength());
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
 		Error(E_WARNING, L"无法连接到服务器");

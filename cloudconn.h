@@ -3,8 +3,8 @@
 #include "stdafx.h"
 #include <afxinet.h>
 
-#define PROTOCOL_VERSION "1.0"
-#define USER_AGENT "responser/" PROTOCOL_VERSION
+#define PROTOCOL_VERSION L"1.0"
+#define USER_AGENT L"responser/" PROTOCOL_VERSION
 
 class CloudConn
 {
@@ -14,7 +14,7 @@ protected:
 	CHttpFile *file;
 	CString postData;
 public:
-	CloudConn(const char* path);
+	CloudConn(CString path);
 	~CloudConn();
 	void SetBody(CString key, CString value);
 	void RawBody(CString str);

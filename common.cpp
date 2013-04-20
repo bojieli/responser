@@ -3,11 +3,10 @@
 
 void Error(int errorno, const wchar_t *errmsg)
 {
-	setlocale(LC_ALL, "chs");
 	if (errorno == E_FATAL || errorno == E_WARNING) {
-		wprintf(errmsg);
-		printf("\n");
+		AfxMessageBox(errmsg);
 	}
-	if (errorno == E_FATAL)
-		return;
+	if (errorno == E_FATAL) {
+		exit(1);
+	}
 }

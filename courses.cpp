@@ -30,3 +30,8 @@ void Courses::each(void callback(Course* c))
 		curr = curr->next;
 	}
 }
+void Courses::add(Course* c)
+{
+	c->next = head->next;
+	head->next = c;
+}

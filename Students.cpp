@@ -91,7 +91,7 @@ Students::Students(LocalSto* sto, UINT course)
 	this->StuAtClass = 0;
 	this->StuAlreadyAns = 0;
 	this->Sto = sto;
-	sto->setCourseId(course);
+	sto->setCurCourse(course);
 	sto->initStuNames(this);
 }
 Students::~Students(void)

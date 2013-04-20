@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "responser.h"
 #include "Students.h"
+#include "localsto.h"
 #include "courses.h"
 
 #ifdef _DEBUG
@@ -30,16 +31,25 @@ void test()
 	BaseStation station;
 	printf("new LocalSto...\n");
 	LocalSto* sto = new LocalSto(station.ID(), station.token());
-	printf("All courses:\n");
+	printf("all courses:\n");
 	Courses courses;
 	sto->getCourses(&courses);
 	courses.each(show_course);
 	UINT course;
-	printf("select course: ");
+	printf("input course ID: ");
 	scanf_s("%d", &course);
-	Students* stu = new Students(sto, course);
-	printf("Students Info:\n");
-	stu->each(show_stu);
+	Students* students = new Students(sto, course);
+	printf("students info:\n");
+	students->each(show_stu);
+	
+	Course* newCourse = new Course(0, "hello", "world");
+	if (sto->addCourse(newCourse))
+		printf("add course OK\n");
+	else
+		printf("add course error\n");
+	courses.add(newCourse);
+	printf("new students info:\n");
+	students->each(show_stu);
 }
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])

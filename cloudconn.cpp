@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "cloudconn.h"
 
-CloudConn::CloudConn(const char* path)
+CloudConn::CloudConn(CString path)
 {
 	try {
 		session = new CInternetSession(L"responser");
@@ -46,19 +46,24 @@ CString CloudConn::send(UINT StationID, CString StationToken)
 	DWORD dwRet;
 	try {
 		CString header;
-		header.Format(L"User-Agent: %s\r\nStation-ID: %u\r\nStation-Token: %s\r\n", USER_AGENT, StationID, StationToken);
+		header.Format(L"User-Agent: " USER_AGENT L"\r\nStation-ID: %u\r\nStation-Token: %s\r\n", StationID, StationToken);
 		file->SendRequest(header, header.GetLength(), (LPVOID)(LPCTSTR)postData, postData.GetLength());
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
 		Error(E_WARNING, L"无法连接到服务器");
+		return "";
 	}
 	file->QueryInfoStatusCode(dwRet);
     if(dwRet != HTTP_STATUS_OK) {
 		Error(E_WARNING, L"与云端间的数据通信错误");
+		return "";
     }
-	CString response;
-    CString tmp;
-    while (file->ReadString(tmp))
-        response += tmp;
+	CString response = "";
+	UINT recvsize;
+	char buf[1025] = {0};
+    while (recvsize = file->Read(buf, 1024)) {
+		buf[recvsize] = '\0';
+        response += CString(buf);
+	}
 	return response;
 }

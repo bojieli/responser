@@ -17,4 +17,5 @@ public:
 	Courses(void);
 	~Courses(void);
 	void each(void callback(Course* c));
+	void add(Course* c);
 };

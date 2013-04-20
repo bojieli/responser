@@ -58,12 +58,21 @@ CString CloudConn::send(UINT StationID, CString StationToken)
 		Error(E_WARNING, L"与云端间的数据通信错误");
 		return "";
     }
-	CString response = "";
+
+#define BUF_SIZE 1024
+	char* response = NULL;
+	UINT totalsize = 0;
 	UINT recvsize;
-	char buf[1025] = {0};
-    while (recvsize = file->Read(buf, 1024)) {
-		buf[recvsize] = '\0';
-        response += CString(buf);
+	char buf[BUF_SIZE+1];
+    while (recvsize = file->Read(buf, BUF_SIZE)) {
+		response = (char*)realloc(response, totalsize + recvsize);
+		memcpy(response + totalsize, buf, recvsize);
+		totalsize += recvsize;
 	}
-	return response;
+	response[totalsize] = '\0';
+	int w_response_len = MultiByteToWideChar(CP_UTF8, 0, response, -1, NULL, 0);
+	wchar_t* w_response = new wchar_t[w_response_len+1];
+	memset(w_response, 0, (w_response_len+1)*sizeof(wchar_t));
+	MultiByteToWideChar(CP_UTF8, 0, response, -1, w_response, w_response_len);
+	return CString(w_response);
 }

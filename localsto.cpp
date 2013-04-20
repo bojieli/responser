@@ -316,10 +316,14 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 	sql.Format(L"INSERT INTO %s (%s) VALUES ", table, columns);
 	bool first = true;
 	while (str.GetLength() > 0) {
-		if (!first)
+		if (!first) {
+			ASSERT_CHAR(str, '\n');
 			sql += CString(",");
+		}
 		else
 			first = false;
+		if (str.GetAt(0) == '\n') // the end of this section
+			break;
 		sql += CString("(");
 		for (int i=0; i<column_count; i++) {
 			if (i>0) {
@@ -330,7 +334,6 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 			sql += stripslashesForSpace(str, rightstr);
 			str = *rightstr;
 		}
-		ASSERT_CHAR(str, '\n');
 		sql += CString(")");
 	}
 	this->query(sql);
@@ -394,19 +397,24 @@ static CString stripslashesForSpace(CString str, CString* right)
 	CString left = "";
 	while (str.GetLength() > 0) {
 		int n = str.FindOneOf(L"\t\n");
+		
 		if (n == -1) // not found
 			break;
 		if (n == 0) {
 			str = str.Right(str.GetLength() - 1);
 			break;
 		}
-		if (str.GetAt(n-1) == '\\') {
+		if (str.GetAt(n-1) == '\\') { // this is an escaped \t or \n
 			left += str.Left(n-1);
 			left += str.GetAt(n);
 			str = str.Right(str.GetLength() - n - 1);
 			continue;
 		}
-		else break;
+		else { // \t or \n as separator
+			left += str.Left(n);
+			str = str.Right(str.GetLength() - n);
+			break;
+		}
 	}
 	left.Replace(L"\\\\", L"\\");
 	*right = str;

@@ -31,9 +31,9 @@ void test()
 	BaseStation station;
 	printf("new LocalSto...\n");
 	LocalSto* sto = new LocalSto(station.ID(), station.token());
-	printf("all courses:\n");
 	Courses courses;
 	sto->getCourses(&courses);
+	printf("Total %d courses:\n", courses.Count);
 	courses.each(show_course);
 	UINT course;
 	printf("input course ID: ");

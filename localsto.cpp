@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "localsto.h"
 
-static CString addslashes(CString str);
+static CString escape(CString str);
 static CString addslashesForSpace(CString str);
 static CString stripslashesForSpace(CString str, CString* rightstr);
 static UINT toUINT(BYTE* s, int count);
 static BYTE* toBytes(UINT num, int count);
+static int CharacterCount(CString& csString_i, TCHAR sChar_i);
+static CString UintToCString(UINT data);
 
 /* @brief	本地存储类构造函数
  * @param	StationID ID
@@ -29,7 +31,7 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 }
 LocalSto::~LocalSto()
 {
-	this->squery(_T("UPDATE lecture SET end_time=%ld WHERE course='%s' AND id=%d"), time(NULL), course, lectureID);
+	this->squery(_T("UPDATE lecture SET end_time=%ld WHERE course=%d AND id=%d"), time(NULL), course, lectureID);
 	if (SQLITE_OK != sqlite3_close(dbconn)) {
 		Error(E_WARNING, _T("无法正常关闭数据库"));
 		error = 3;
@@ -60,7 +62,7 @@ bool LocalSto::setCurCourse(UINT courseID)
 	int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
 	if (!squery(_T("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
 		goto error;
-	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%ld)"), courseID, lecture_count+1, time(NULL)))
+	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
 		goto error;
 	this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
 	return true;
@@ -116,8 +118,8 @@ bool LocalSto::stuSignIn(UINT ProductId)
  */
 bool LocalSto::setNumericId(CString NumericId, UINT ProductId)
 {
-	return this->squery(_T("REPLACE INTO product (id,numeric_id) VALUES ('%ld','%s')"),
-		ProductId, NumericId);
+	return this->squery(_T("REPLACE INTO product (id,numeric_id) VALUES (%u,%s)"),
+		ProductId, escape(NumericId));
 }
 /* @brief	将数据库查询结果表示成字符串
  * @param	sql 数据库查询
@@ -148,7 +150,7 @@ bool LocalSto::addCourse(Course* course)
 {
 	if (!insert(_T("course"), _T("name,info"), course->name, course->info)) {
 		error = 5;
-		Error(E_FATAL, _T("无法保存课程到本地数据库"));
+		Error(E_FATAL, _T("无法保存课程到本地数据库\n技术信息：\n") + CString(errmsg));
 		return false;
 	}
 	sqlite3_int64 course_id = sqlite3_last_insert_rowid(dbconn);
@@ -306,16 +308,16 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 
 	CString sql;
 	sql.Format(_T("INSERT INTO %s (%s) VALUES "), table, columns);
-	bool first = true;
+	bool firstLine = true;
 	while (str.GetLength() > 0) {
-		if (!first) {
+		if (!firstLine)
 			ASSERT_CHAR(str, '\n');
-			sql += _T(",");
-		}
-		else
-			first = false;
 		if (str.GetAt(0) == '\n') // the end of this section
 			break;
+		if (!firstLine)
+			sql += _T(",");
+		if (firstLine)
+			firstLine = false;
 		sql += _T("(");
 		for (int i=0; i<column_count; i++) {
 			if (i>0) {
@@ -323,12 +325,17 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 				sql += _T(",");
 			}
 			CString *rightstr = new CString();
-			sql += stripslashesForSpace(str, rightstr);
+			sql += escape(stripslashesForSpace(str, rightstr));
 			str = *rightstr;
 		}
 		sql += _T(")");
 	}
-	this->query(sql);
+	if (firstLine == true) // 没有数据
+		return str;
+	if (!this->query(sql)) {
+		error = 11;
+		Error(E_WARNING, _T("从云端同步数据时数据库错误\n技术信息：\n") + CString(errmsg) + _T("\n") + sql);
+	}
 	return str;
 error:
 	error = 9;
@@ -465,43 +472,40 @@ CString LocalSto::selectFirst(CString format, ...)
 	return CString(retval);
 }
 
-bool LocalSto::insert(CString table, CString fields, CString data1, ...)
-{
-	CString sql;
- 	sql.Format(_T("INSERT INTO %s (%s) VALUES ("), table, fields);
-	va_list args;
-	va_start(args, data1);
-	bool isFirst = true;
-	while (CString data = va_arg(args, CString)) {
-		if (isFirst)
-			isFirst = false;
-		else
-			sql += _T(",");
-		sql += _T("'");
-		sql += escape(data);
-		sql += _T("'");
-	}
-	va_end(args);
-	sql += _T(")");
-	return this->query(sql);
+#define __GENERIC_INSERT(Type, DataHandler) \
+bool LocalSto::insert(CString table, CString fields, Type data1, ...) \
+{ \
+	int commaCount = CharacterCount(fields, ','); \
+	CString sql; \
+ 	sql.Format(_T("INSERT INTO %s (%s) VALUES ("), table, fields); \
+	va_list args; \
+	va_start(args, data1); \
+	sql += DataHandler(data1); \
+	for (int i=0; i<commaCount; i++) { \
+		Type d = va_arg(args, Type); \
+		sql += _T(","); \
+		sql += DataHandler(d); \
+	} \
+	va_end(args); \
+	sql += _T(")"); \
+	return this->query(sql); \
 }
-bool LocalSto::insert(CString table, CString fields, UINT data1, ...)
+__GENERIC_INSERT(UINT, UintToCString)
+__GENERIC_INSERT(CString, escape)
+
+static int CharacterCount(CString& csString_i, TCHAR sChar_i)
 {
-	CString sql;
-	sql.Format(_T("INSERT INTO %s (%s) VALUES ("), table, fields);
-	va_list args;
-	va_start(args, data1);
-	bool isFirst = true;
-	while (UINT data = va_arg(args, UINT)) {
-		if (isFirst)
-			isFirst = false;
-		else
-			sql += _T(",");
-		CString data_int;
-		data_int.Format(_T("%ld"), data);
-		sql += data_int;
-	}
-	va_end(args);
-	sql += _T(")");
-	return this->query(sql);
+	if( csString_i.IsEmpty())
+		return 0;
+	int nFind = -1;
+	int nCount = 0;
+	while( -1 != ( nFind = csString_i.Find( sChar_i, nFind + 1 )))
+		nCount++;
+	return nCount;
+}
+static CString UintToCString(UINT data)
+{
+	CString data_int;
+	data_int.Format(_T("%u"), data);
+	return data_int;
 }

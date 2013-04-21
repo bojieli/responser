@@ -103,7 +103,7 @@ class Students
 public:
 	UINT course;			//班级编号
 	LocalSto* Sto;			//数据库连接
-	Stu* head;				//学生链表
+	Stu* head;				//学生链表，head 是哨兵
 	StuStaticList InfoList;	//学生静态信息链表
 	UINT beginTime;			//答题开始时间
 	BYTE CorAnswer;			//最近一次正确答案

@@ -247,7 +247,7 @@ bool Students::Add(CString NumericId, UINT ProductId)
  */
 void Students::each(void callback(Stu* stu))
 {
-	Stu* curr = head;
+	Stu* curr = head->next;
 	while (curr != NULL) {
 		callback(curr);
 		curr = curr->next;
@@ -258,7 +258,7 @@ void Students::each(void callback(Stu* stu))
  */
 void Students::each(void callback(UINT ProductId, CString Name, CString StudentId))
 {
-	Stu* curr = head;
+	Stu* curr = head->next;
 	while (curr != NULL) {
 		callback(curr->ProductId, curr->Info->Name, curr->Info->StudentId);
 		curr = curr->next;

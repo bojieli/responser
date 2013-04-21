@@ -47,7 +47,7 @@ CString CloudConn::send(UINT StationID, CString StationToken)
 	try {
 		CString header;
 		header.Format(_T("User-Agent: ") USER_AGENT _T("\r\nStation-ID: %u\r\nStation-Token: %s\r\n"), StationID, StationToken);
-		file->SendRequest(header, header.GetLength(), (LPVOID)(LPCTSTR)postData, postData.GetLength());
+		file->SendRequest(header, header.GetLength(), (CW2A)postData, postData.GetLength());
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
 		Error(E_WARNING, _T("无法连接到服务器"));

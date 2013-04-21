@@ -3,6 +3,7 @@
 class Course {
 public:
 	Course(UINT id, CString name, CString info);
+	Course(void); // 用于哨兵
 	UINT id;
 	CString course_id;
 	CString name;
@@ -14,7 +15,7 @@ public:
 class Courses {
 public:
 	int Count; // 课程数目
-	Course* head;
+	Course* head; // head 是哨兵
 	Courses(void);
 	~Courses(void);
 	void each(void callback(Course* c));

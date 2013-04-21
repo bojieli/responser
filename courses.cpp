@@ -8,10 +8,14 @@ Course::Course(UINT id, CString name, CString info)
 	this->info = info;
 	this->next = NULL;
 }
+Course::Course(void)
+{
+	this->next = NULL;
+}
 
 Courses::Courses(void)
 {
-	this->head = NULL;
+	this->head = new Course();
 	this->Count = 0;
 }
 Courses::~Courses(void)
@@ -25,7 +29,7 @@ Courses::~Courses(void)
 }
 void Courses::each(void callback(Course* c))
 {
-	Course* curr = head;
+	Course* curr = head->next;
 	while (curr != NULL) {
 		callback(curr);
 		curr = curr->next;

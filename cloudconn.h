@@ -3,8 +3,8 @@
 #include "stdafx.h"
 #include <afxinet.h>
 
-#define PROTOCOL_VERSION L"1.0"
-#define USER_AGENT L"responser/" PROTOCOL_VERSION
+#define PROTOCOL_VERSION _T("1.0")
+#define USER_AGENT _T("responser/") PROTOCOL_VERSION
 
 class CloudConn
 {

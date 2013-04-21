@@ -12,6 +12,7 @@ Course::Course(UINT id, CString name, CString info)
 Courses::Courses(void)
 {
 	this->head = NULL;
+	this->Count = 0;
 }
 Courses::~Courses(void)
 {
@@ -34,4 +35,5 @@ void Courses::add(Course* c)
 {
 	c->next = head->next;
 	head->next = c;
+	this->Count++;
 }

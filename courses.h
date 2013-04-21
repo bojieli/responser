@@ -13,6 +13,7 @@ public:
 
 class Courses {
 public:
+	int Count; // ¿Î³ÌÊıÄ¿
 	Course* head;
 	Courses(void);
 	~Courses(void);

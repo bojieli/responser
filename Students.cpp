@@ -10,7 +10,7 @@ StuStatic::StuStatic(CString Name, CString StudentId, CString NumericId)
 }
 StuStatic::StuStatic(void)
 {
-	this->Name = CString(L"ÄäÃû");
+	this->Name = _T("ÄäÃû");
 	this->StudentId = CString();
 	this->NumericId = CString();
 }
@@ -68,6 +68,7 @@ Stu::Stu(UINT ProductId)
 	Ans = 0;
 	AnsTime = 0;
 	next = NULL;
+	mark = 0;
 	IsAtClass = false;
 	this->ProductId = ProductId;
 	Info = NULL;

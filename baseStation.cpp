@@ -5,5 +5,5 @@ UINT BaseStation::ID() {
 	return 0xdeadbeef;
 }
 CString BaseStation::token() {
-	return CString(L"helloworld");
+	return _T("helloworld");
 }

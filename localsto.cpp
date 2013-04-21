@@ -82,8 +82,8 @@ bool LocalSto::saveAnswers(Students *s)
 	Stu* stu = s->head;
 	bool success = true;
 	while ((stu = stu->next) != NULL) {
-		if (!this->insert(CString("answer"), CString("course,lecture,problem,product,answer,ans_time"),
-			course, lectureID, s->QuesTotal, stu->ProductId, stu->Ans, stu->AnsTime))
+		if (!this->insert(CString("answer"), CString("course,lecture,problem,product,answer,ans_time,mark"),
+			course, lectureID, s->QuesTotal, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark))
 			success = false;
 	}
 	if (success)
@@ -182,7 +182,7 @@ bool LocalSto::uploadToCloud()
 	data += "\n";
 	data += this->rowsToStr(CString("SELECT course,lecture,problem,begin_time,end_time,corrent_ans FROM problem"));
 	data += "\n";
-	data += this->rowsToStr(CString("SELECT course,lecture,problem,product,ans,ans_time FROM answer"));
+	data += this->rowsToStr(CString("SELECT course,lecture,problem,product,ans,ans_time,mark FROM answer"));
 
 	CloudConn *cloud = new CloudConn(CString("upload"));
 	cloud->RawBody(data);
@@ -248,7 +248,8 @@ bool LocalSto::initDbFile()
 		"problem INTEGER,"
 		"product INTEGER,"
 		"ans INTEGER,"
-		"ans_time INTEGER)")))
+		"ans_time INTEGER,"
+		"mark INTEGER)")))
 		return false;
 	return true;
 	/*

@@ -215,6 +215,19 @@ bool Students::Register(CString NumericId, UINT ProductId)
 	}
 	return SetInfoByNumericId(now, NumericId);
 }
+/* @brief	老师给学生正在回答的问题评分
+ * @param	ProductId	产品ID
+ * @param	mark		评分
+ * @return	评分是否成功（只有在答题状态才能评分）
+ */
+bool Students::TeacherMark(UINT ProductId, BYTE mark)
+{
+	Stu* now = this->FindByProductId(ProductId);
+	if (now == NULL)
+		return false;
+	now->mark = mark;
+	return true;
+}
 /* @brief	从数据库初始化学号
  * @param	NumericId	数字学号
  * @param	ProductId	产品ID

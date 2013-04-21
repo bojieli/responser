@@ -85,11 +85,12 @@ class Stu
 {
 public:
 	StuStatic* Info;		//学生静态信息
-	UINT ProductId;	//答题器ID
+	UINT ProductId;			//答题器ID
 	Stu* next;				//学生链表下一元素
 public: // 学生作答信息
 	BYTE Ans;				//最近一次作答的答案
-	UINT AnsTime;	//最近一次答题所需时间
+	UINT AnsTime;			//最近一次答题所需时间
+	BYTE mark;				//评分
 	bool IsAtClass;			//是否在课堂上
 public: 
 	Stu(UINT ProductId);
@@ -122,6 +123,7 @@ public: //答题器接口操作
 	bool USBAddAnswer(UINT ProductId, BYTE ANS); // USB答题和签到
 	bool USBAddCorAnswer(BYTE ANS); //添加正确答案
 	bool Register(CString NumericId, UINT ProductId); //答题器设置学号，注册模式
+	bool TeacherMark(UINT ProductId, BYTE mark); // 老师给学生评分
 public: //从数据库初始化
 	bool Add(CString NumericId, UINT ProductId);
 public: //遍历学生

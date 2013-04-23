@@ -209,7 +209,7 @@ bool LocalSto::initDbFile()
 {
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS course ( \
 		id INTEGER PRIMARY KEY, \
-		course_id TEXT UNIQUE, \
+		course_id TEXT, \
 		name TEXT, \
 		lecture_count INTEGER, \
 		info TEXT \
@@ -217,8 +217,8 @@ bool LocalSto::initDbFile()
 		return false;
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS student ( \
 		course INTEGER, \
-		student_id TEXT UNIQUE, \
-		numeric_id TEXT, \
+		student_id TEXT, \
+		numeric_id TEXT UNIQUE, \
 		name TEXT \
 		)")))
 		return false;

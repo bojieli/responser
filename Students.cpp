@@ -2,17 +2,25 @@
 #include "Students.h"
 #include "localsto.h"
 
+/* 新建普通学生 */
 StuStatic::StuStatic(CString Name, CString StudentId, CString NumericId)
 {
 	this->Name = Name;
 	this->StudentId = StudentId;
 	this->NumericId = NumericId;
+	this->IsAtClass = false;
 }
-StuStatic::StuStatic(void)
+/* 新建匿名学生 */
+StuStatic::StuStatic(CString NumericId)
 {
 	this->Name = _T("匿名");
 	this->StudentId = CString();
-	this->NumericId = CString();
+	this->NumericId = NumericId;
+	this->IsAtClass = true; // 匿名学生是到课的不在名单里的学生
+}
+/* 新建哨兵 */
+StuStatic::StuStatic(void)
+{
 }
 StuStatic::~StuStatic(void)
 {
@@ -65,13 +73,13 @@ StuStatic* StuStaticList::FindByNumericId(CString NumericId)
 
 Stu::Stu(UINT ProductId)
 {
+	Info = NULL;
+	this->ProductId = ProductId;
+	isAnonymous = true;
+	next = NULL;
 	Ans = 0;
 	AnsTime = 0;
-	next = NULL;
 	mark = 0;
-	IsAtClass = false;
-	this->ProductId = ProductId;
-	Info = NULL;
 }
 Stu::~Stu(void)
 {
@@ -160,10 +168,10 @@ bool Students::AddAnswer(UINT ProductID, BYTE ANS, UINT AnsTime)
 		{
 			StuAlreadyAns++;
 		}
-		if(!now->IsAtClass) // 如果还没签到，先签到
+		if(!now->Info->IsAtClass) // 如果还没签到，先签到
 		{
 			StuAtClass++;
-			now->IsAtClass = true;
+			now->Info->IsAtClass = true;
 		}
 		if(now->Ans!=ANS) // 修改此题答案
 		{
@@ -194,7 +202,7 @@ bool Students::SignIn(UINT ProductId)
 	Stu* now;
 	Sto->stuSignIn(ProductId);
 	if (now = FindByProductId(ProductId)) { //在名单中
-		now->IsAtClass = true;
+		now->Info->IsAtClass = true;
 		return true;
 	} else {
 		AddAnonymous(ProductId);
@@ -211,7 +219,7 @@ bool Students::Register(CString NumericId, UINT ProductId)
 {
 	Sto->setNumericId(NumericId, ProductId);
 	Stu* now = this->FindByProductId(ProductId);
-	if (now == NULL) { // 此答题器尚未签到
+	if (now == NULL) { // 此答题器尚未注册
 		now = AddAnonymous(ProductId);
 	}
 	return SetInfoByNumericId(now, NumericId);
@@ -270,17 +278,17 @@ bool Students::SetInfoByNumericId(Stu* now, CString NumericId)
 {
 	StuStatic* info = InfoList.FindByNumericId(NumericId);
 	if (info == NULL) { // 学生不在静态名单中
-		now->Info = new StuStatic();
+		now->Info = new StuStatic(NumericId);
 		return false;
-	} else {
+	} else { // 学生在静态名单中
 		now->Info = info;
+		now->isAnonymous = false;
 		return true;
 	}
 }
 Stu* Students::AddAnonymous(UINT ProductId)
 {
 	Stu* now = new Stu(ProductId);
-	now->IsAtClass = true;
 	now->next = head->next;
 	head->next = now;
 	return now;

@@ -32,9 +32,9 @@ CloudConn::~CloudConn()
 void CloudConn::SetBody(CString key, CString value)
 {
 	if (postData.GetLength() > 0)
-		postData += _T('&');
+		postData += _T("&");
 	postData += key;
-	postData += _T('=');
+	postData += _T("=");
 	postData += value;
 }
 void CloudConn::RawBody(CString str)
@@ -51,12 +51,12 @@ CString CloudConn::send(UINT StationID, CString StationToken)
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
 		Error(E_WARNING, _T("无法连接到服务器"));
-		return "";
+		return _T("");
 	}
 	file->QueryInfoStatusCode(dwRet);
     if(dwRet != HTTP_STATUS_OK) {
 		Error(E_WARNING, _T("与云端间的数据通信错误"));
-		return "";
+		return _T("");
     }
 
 #define BUF_SIZE 1024

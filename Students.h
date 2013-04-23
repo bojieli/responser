@@ -60,10 +60,12 @@ public:
 	CString Name;		//姓名
 	CString StudentId;	//学号
 	CString NumericId;	//数字学号
+	bool IsAtClass;		//是否在课堂上
 	StuStatic* next;
 public:
-	StuStatic(void);
-	StuStatic(CString Name, CString StudentID, CString NumericId);
+	StuStatic(CString Name, CString StudentID, CString NumericId); // 新建普通学生
+	StuStatic(CString NumericId); // 新建匿名学生
+	StuStatic(void); // 新建哨兵
 	~StuStatic(void);
 };
 
@@ -86,12 +88,12 @@ class Stu
 public:
 	StuStatic* Info;		//学生静态信息
 	UINT ProductId;			//答题器ID
+	bool isAnonymous;		//是否匿名
 	Stu* next;				//学生链表下一元素
 public: // 学生作答信息
 	BYTE Ans;				//最近一次作答的答案
 	UINT AnsTime;			//最近一次答题所需时间
 	BYTE mark;				//评分
-	bool IsAtClass;			//是否在课堂上
 public: 
 	Stu(UINT ProductId);
 	~Stu(void);
@@ -112,7 +114,7 @@ public:
 	int StuAtClass;			//到位的学生总数
 	int StuAlreadyAns;		//已经答题的学生数目
 	bool isStarted;			//是否处于答题状态
-	UINT AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
+	UINT AnswerCount[64];   //记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;
 public: //选定班级后实例化
 	Students(LocalSto* sto, UINT course);
 	~Students(void);

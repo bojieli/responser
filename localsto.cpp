@@ -40,7 +40,7 @@ LocalSto::~LocalSto()
 /* INTERNAL */
 static int getcourse_callback(void* courses, int cols, char** values, char** fields)
 {
-	Course* newc = new Course(atoi(values[0]), values[1], values[2]);
+	Course* newc = new Course((UINT)atoi(values[0]), CString(values[1]), CString(values[2]));
 	((Courses*)courses)->add(newc);
 	return 0;
 }
@@ -340,7 +340,7 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 error:
 	error = 9;
 	Error(E_FATAL, _T("从云端下载的数据格式错误"));
-	return "";
+	return _T("");
 }
 /* @brief	用本地数据库的学生姓名信息初始化内存数据结构
  * @param	m_List 学生姓名表
@@ -382,7 +382,7 @@ static BYTE* toBytes(UINT num, int count)
 static CString escape(CString str)
 {
 	str.Replace(_T("'"), _T("\\'"));
-	return "'" + str + "'";
+	return _T("'") + str + _T("'");
 }
 static CString addslashesForSpace(CString str)
 {
@@ -393,14 +393,14 @@ static CString addslashesForSpace(CString str)
 }
 static CString stripslashesForSpace(CString str, CString* right)
 {
-	CString left = "";
+	CString left = _T("");
 	while (str.GetLength() > 0) {
 		int n = str.FindOneOf(_T("\t\n"));
 		
 		if (n == -1) // not found
 			break;
 		if (n == 0) {
-			str = str.Right(str.GetLength() - 1);
+			str = str.Right(str.GetLength());
 			break;
 		}
 		if (str.GetAt(n-1) == '\\') { // this is an escaped \t or \n

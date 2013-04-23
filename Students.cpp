@@ -263,7 +263,9 @@ bool Students::Add(CString NumericId, UINT ProductId)
 {
 	Stu* now = new Stu(ProductId); //数据库保证 ProductId 不重复
 	AddToList(now);
-	return SetInfoByNumericId(now, NumericId);
+	bool flag = SetInfoByNumericId(now, NumericId);
+	SignIn(ProductId);
+	return flag;
 }
 /* @brief	遍历在线学生
  * @param	回调函数，参数为学生类型对象

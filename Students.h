@@ -73,6 +73,7 @@ class StuStaticList
 {
 public:
 	StuStatic* head;
+	int StuNum;	// 名单中的学生总数
 public: //查找学生
 	StuStatic* FindByStudentId(CString StudentId);
 	StuStatic* FindByNumericId(CString NumericId);
@@ -81,6 +82,8 @@ public: //添加学生
 public:
 	StuStaticList(void);
 	~StuStaticList(void);
+public: //遍历名单
+	void each(void callback(CString Name, CString StudentId, CString NumericId, bool IsAtClass));
 };
 
 class Stu
@@ -109,8 +112,8 @@ public:
 	StuStaticList InfoList;	//学生静态信息链表
 	UINT beginTime;			//答题开始时间
 	BYTE CorAnswer;			//最近一次正确答案
-	int QuesTotal;			//题目总数
-	int StudTotal;			//学生总数
+	int QuestionNum;		//题目总数
+	int OnlineStuNum;		//到课学生总数
 	int StuAtClass;			//到位的学生总数
 	int StuAlreadyAns;		//已经答题的学生数目
 	bool isStarted;			//是否处于答题状态
@@ -128,10 +131,13 @@ public: //答题器接口操作
 	bool TeacherMark(UINT ProductId, BYTE mark); // 老师给学生评分
 public: //从数据库初始化
 	bool Add(CString NumericId, UINT ProductId);
-public: //遍历学生
+public:
 	void each(void callback(Stu* stu));
-	void each(void callback(UINT ProductId, CString Name, CString StudentId));
-private:
+	void each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId)); //遍历已签到的学生
+	void eachAnonymous(void callback(UINT ProductId, CString NumericId)); //遍历匿名学生
+
+private: // ===== 以下是私有函数 =====
+	void AddToList(Stu* stu);
 	bool AddAnswer(UINT ProductId, BYTE ANS, UINT AnsTime); //学生答题
 	bool AddCorAnswer(BYTE ANS); //添加正确答案
 	bool SignIn(UINT ProductId); //答题器签到

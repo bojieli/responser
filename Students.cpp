@@ -29,6 +29,7 @@ StuStatic::~StuStatic(void)
 StuStaticList::StuStaticList(void)
 {
 	head = new StuStatic();
+	StuNum = 0;
 }
 StuStaticList::~StuStaticList(void)
 {
@@ -50,6 +51,7 @@ StuStatic* StuStaticList::Add(CString Name, CString StudentId, CString NumericId
 	StuStatic *now = new StuStatic(Name, StudentId, NumericId);
 	now->next = head->next;
 	head->next = now;
+	++StuNum;
 	return now;
 }
 /* @brief	根据学号查询学生
@@ -62,6 +64,8 @@ StuStatic* StuStaticList::FindByStudentId(CString StudentId)
 			return now;
 	return NULL;
 }
+/* @brief	根据学号查询学生
+ */
 StuStatic* StuStaticList::FindByNumericId(CString NumericId)
 {
 	StuStatic* now = head;
@@ -69,6 +73,17 @@ StuStatic* StuStaticList::FindByNumericId(CString NumericId)
 		if(now->NumericId == NumericId)
 			return now;
 	return NULL;
+}
+/* @brief	遍历名单中的学生
+ * @param	回调函数，参数依次为学生姓名、学号、数字学号
+ */
+void StuStaticList::each(void callback(CString Name, CString StudentId, CString NumericId, bool IsAtClass))
+{
+	StuStatic* curr = head->next;
+	while (curr != NULL) {
+		callback(curr->Name, curr->StudentId, curr->NumericId, curr->IsAtClass);
+		curr = curr->next;
+	}
 }
 
 Stu::Stu(UINT ProductId)
@@ -93,15 +108,16 @@ Stu::~Stu(void)
 Students::Students(LocalSto* sto, UINT course)
 {
 	this->head = new Stu(0); //哨兵
-	this->QuesTotal = 0;
-	this->StudTotal = 0;
+	this->QuestionNum = 0;
+	this->OnlineStuNum = 0;
 	this->course = course;
 	this->isStarted = false;
 	this->StuAtClass = 0;
 	this->StuAlreadyAns = 0;
 	this->Sto = sto;
 	sto->setCurCourse(course);
-	sto->initStuNames(this);
+	sto->initStuStaticList(this);
+	sto->initStudents(this);
 }
 Students::~Students(void)
 {
@@ -119,7 +135,7 @@ void Students::Start()
 {
 	isStarted = true;
 	StuAlreadyAns = 0;
-	QuesTotal++;
+	QuestionNum++;
 	for(int i = 0;i<64;i++)
 		AnswerCount[i] = 0;
 }
@@ -246,11 +262,10 @@ bool Students::TeacherMark(UINT ProductId, BYTE mark)
 bool Students::Add(CString NumericId, UINT ProductId)
 {
 	Stu* now = new Stu(ProductId); //数据库保证 ProductId 不重复
-	now->next = head->next;
-	head->next = now;
+	AddToList(now);
 	return SetInfoByNumericId(now, NumericId);
 }
-/* @brief	遍历班级内所有学生
+/* @brief	遍历在线学生
  * @param	回调函数，参数为学生类型对象
  */
 void Students::each(void callback(Stu* stu))
@@ -261,19 +276,36 @@ void Students::each(void callback(Stu* stu))
 		curr = curr->next;
 	}
 }
-/* @brief	遍历班级内所有学生
- * @param	回调函数，参数依次为答题器ID、学生姓名、学号
+/* @brief	遍历在线学生
+ * @param	回调函数，参数依次为答题器ID、学生姓名、学号、数字学号
  */
-void Students::each(void callback(UINT ProductId, CString Name, CString StudentId))
+void Students::each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId))
 {
 	Stu* curr = head->next;
 	while (curr != NULL) {
-		callback(curr->ProductId, curr->Info->Name, curr->Info->StudentId);
+		callback(curr->ProductId, curr->Info->Name, curr->Info->StudentId, curr->Info->NumericId);
+		curr = curr->next;
+	}
+}
+/* @brief	遍历匿名学生
+ * @param	回调函数，参数依次为答题器ID、数字学号
+ */
+void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId))
+{
+	Stu* curr = head->next;
+	while (curr != NULL) {
+		if (curr->isAnonymous)
+			callback(curr->ProductId, curr->Info->NumericId);
 		curr = curr->next;
 	}
 }
 
 // 以下是私有函数
+void Students::AddToList(Stu* now) {
+	now->next = head->next;
+	head->next = now;
+	++OnlineStuNum;
+}
 bool Students::SetInfoByNumericId(Stu* now, CString NumericId)
 {
 	StuStatic* info = InfoList.FindByNumericId(NumericId);
@@ -289,8 +321,7 @@ bool Students::SetInfoByNumericId(Stu* now, CString NumericId)
 Stu* Students::AddAnonymous(UINT ProductId)
 {
 	Stu* now = new Stu(ProductId);
-	now->next = head->next;
-	head->next = now;
+	AddToList(now);
 	return now;
 }
 Stu* Students::FindByProductId(UINT ProductId)

@@ -18,12 +18,35 @@ CWinApp theApp;
 
 using namespace std;
 
-void show_course(Course* c) {
-	printf("%u %s %s\n", c->id, c->name, c->info);
+void showCourse(Course* c) {
+	wprintf_s(L"%u %s %s\n", c->id, c->name, c->info);
 }
-void show_stu(UINT ProductId, CString Name, CString StudentId)
+void showStu(UINT ProductId, CString Name, CString StudentId, CString NumericId)
 {
-	printf("ProductId=%u Name=%s StudentId=%s\n", ProductId, Name, StudentId);
+	wprintf_s(L"[%u]\t%s\t%s\t%s\n", ProductId, Name, StudentId, NumericId);
+}
+void showStuAnonymous(UINT ProductId, CString NumericId)
+{
+	wprintf_s(L"[%u]\t%s\n", ProductId, NumericId);
+}
+void showStuStatic(CString Name, CString StudentId, CString NumericId, bool IsAtClass)
+{	
+	wprintf_s(L"%s\t%s\t%s\t", Name, StudentId, NumericId);
+	if (IsAtClass)
+		wprintf_s(L"IsAtClass");
+	wprintf_s(L"\n");
+}
+
+void newCourse(Students* students, LocalSto* sto, Courses* courses)
+{
+	Course* newCourse = new Course(0, "hello", "world");
+	if (sto->addCourse(newCourse))
+		printf("add course OK\n");
+	else
+		printf("add course error\n");
+	courses->add(newCourse);
+	printf("new students info:\n");
+	students->each(showStu);
 }
 
 void test() 
@@ -34,22 +57,17 @@ void test()
 	Courses courses;
 	sto->getCourses(&courses);
 	printf("Total %d courses:\n", courses.Count);
-	courses.each(show_course);
+	courses.each(showCourse);
 	UINT course;
 	printf("input course ID: ");
 	scanf_s("%d", &course);
 	Students* students = new Students(sto, course);
-	printf("students info:\n");
-	students->each(show_stu);
-	
-	Course* newCourse = new Course(0, "hello", "world");
-	if (sto->addCourse(newCourse))
-		printf("add course OK\n");
-	else
-		printf("add course error\n");
-	courses.add(newCourse);
-	printf("new students info:\n");
-	students->each(show_stu);
+	printf("Info of %d static students:\n", students->InfoList.StuNum);
+	students->InfoList.each(showStuStatic);
+	printf("Info of %d online students:\n", students->OnlineStuNum);
+	students->each(showStu);
+	printf("Info of anonymous students:\n");
+	students->eachAnonymous(showStuAnonymous);
 }
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])

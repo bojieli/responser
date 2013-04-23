@@ -43,7 +43,8 @@ public:
 	bool saveCorAnswer(Students* s);		  //保存正确答案
 	bool setNumericId(CString NumericId, UINT ProductId); //设置学号
 	bool stuSignIn(UINT ProductId);			  //学生签到
-	bool initStuNames(Students* s);			  //初始化学生姓名数据结构
+	bool initStuStaticList(Students* s); //初始化学生静态表
+	bool initStudents(Students* s);			  //初始化学生动态表
 private:
 	CString rowsToStr(CString sql); // 将查询结果序列化出来
 	bool initDbFile();			//初始化数据库文件

@@ -79,13 +79,13 @@ bool LocalSto::saveAnswers(Students *s)
 {
 	UINT currTime = (UINT)time(NULL);
 	if (!this->insert(_T("problem"), _T("course,lecture,problem,begin_time,end_time,correct_ans"),
-		course, lectureID, s->QuesTotal, s->beginTime, currTime, s->CorAnswer))
+		course, lectureID, s->QuestionNum, s->beginTime, currTime, s->CorAnswer))
 		return false;
 	Stu* stu = s->head;
 	bool success = true;
 	while ((stu = stu->next) != NULL) {
 		if (!this->insert(_T("answer"), _T("course,lecture,problem,product,answer,ans_time,mark"),
-			course, lectureID, s->QuesTotal, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark))
+			course, lectureID, s->QuestionNum, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark))
 			success = false;
 	}
 	if (success)
@@ -100,7 +100,7 @@ bool LocalSto::saveAnswers(Students *s)
 bool LocalSto::saveCorAnswer(Students *s)
 {
 	return this->squery(_T("UPDATE problem SET correct_ans=%d WHERE course=%d AND lecture=%d AND problem=%d"),
-		course, s->CorAnswer, lectureID, s->QuesTotal);
+		course, s->CorAnswer, lectureID, s->QuestionNum);
 }
 /* @brief	学生签到
  * @param	ProductId 产品ID
@@ -342,21 +342,37 @@ error:
 	Error(E_FATAL, _T("从云端下载的数据格式错误"));
 	return _T("");
 }
-/* @brief	用本地数据库的学生姓名信息初始化内存数据结构
- * @param	m_List 学生姓名表
+/* @brief	用本地数据库初始化学生静态表
+ * @param	s 学生姓名表
  * @return	是否成功
  */
-bool LocalSto::initStuNames(Students* s)
+bool LocalSto::initStuStaticList(Students* s)
 {
 	sqlite3_stmt *stmt = NULL;
 	CString sql;
 	sql.Format(_T("SELECT student_id,numeric_id,name FROM student WHERE course = %d"), s->course);
 	sqlite3_prepare(dbconn, (CW2A)sql, -1, &stmt, (const char **)&errmsg);
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		CString student_id = (CString)sqlite3_column_text(stmt, 0);
-		CString numeric_id = (CString)sqlite3_column_text(stmt, 1);
-		CString name = (CString)sqlite3_column_text(stmt, 2);
-		s->InfoList.Add(name, student_id, numeric_id);
+		CString StudentId = CString(sqlite3_column_text(stmt, 0));
+		CString NumericId = CString(sqlite3_column_text(stmt, 1));
+		CString Name = CString(sqlite3_column_text(stmt, 2));
+		s->InfoList.Add(Name, StudentId, NumericId);
+	}
+	sqlite3_finalize(stmt);
+	return true;
+}
+/* @brief	用本地数据库初始化学生与答题器的映射表
+ * @param	s 学生表
+ * @return	是否成功
+ */
+bool LocalSto::initStudents(Students* s)
+{
+	sqlite3_stmt *stmt = NULL;
+	sqlite3_prepare(dbconn, "SELECT id,numeric_id FROM product", -1, &stmt, (const char **)&errmsg);
+	while (SQLITE_ROW == sqlite3_step(stmt)) {
+		UINT ProductId = (UINT)sqlite3_column_int64(stmt, 0);
+		CString NumericId = (CString)sqlite3_column_text(stmt, 1);
+		s->Add(NumericId, ProductId);
 	}
 	sqlite3_finalize(stmt);
 	return true;

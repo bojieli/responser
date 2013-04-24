@@ -49,6 +49,7 @@ public:
 
 private:
 	CString rowsToStr(CString sql); // 将查询结果序列化出来
+	CString rowsToStrIfNotChanged(CString sql); // 将未被上传过的查询结果序列化出来
 	bool initDbFile();			//初始化数据库文件
 
 	bool uploadToCloud();       //上传答题信息到云端，save 时会自动调用

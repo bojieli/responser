@@ -62,27 +62,27 @@ bool LocalSto::getCourses(Courses* c)
 bool LocalSto::beginCourse(UINT courseID)
 {
 	this->course = courseID;
-	CString lastEndTime = selectFirst(
-		_T("SELECT lecture.end_time FROM lecture, course \
-		   WHERE course.id = %d AND lecture.course = course.id AND lecture.id = course.lecture_count"),
-		courseID);
-	if (lastEndTime == _T("0")) { // 上节课没有正常结束，需要继续进行上节课
-		this->lectureID = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
-		return (this->lectureID > 0);
+	int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
+	if (lecture_count > 0) {
+		CString lastEndTime = selectFirst(
+			_T("SELECT lecture.end_time FROM lecture, course \
+			   WHERE course.id = %d AND lecture.course = course.id AND lecture.id = course.lecture_count"),
+			courseID);
+		if (lastEndTime.GetLength() == 0 || lastEndTime == _T("0")) { // 上节课没有正常结束，需要继续进行上节课
+			this->lectureID = lecture_count;
+			return true;
+		}
 	}
-	else {
-		int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
-		if (!squery(_T("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
-			goto error;
-		if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
-			goto error;
-		this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
-		return (this->lectureID > 0);
+	if (!squery(_T("UPDATE course SET changed=1 AND lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
+		goto error;
+	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
+		goto error;
+	this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
+	return (this->lectureID > 0);
 error:
-		error = 4;
-		Error(E_FATAL, _T("数据库初始化课堂信息失败"));
-		return false;
-	}
+	error = 4;
+	Error(E_FATAL, _T("数据库初始化课堂信息失败"));
+	return false;
 }
 /* @brief	结束一节课
  * @return	是否成功
@@ -150,12 +150,36 @@ bool LocalSto::stuSignIn(UINT ProductId)
  */
 bool LocalSto::setNumericId(CString NumericId, UINT ProductId)
 {
-	return this->squery(_T("REPLACE INTO product (id,numeric_id) VALUES (%u,%s)"),
+	return this->squery(_T("REPLACE INTO product (changed,id,numeric_id) VALUES (1,%u,%s)"),
 		ProductId, escape(NumericId));
+}
+/* @brief	将数据库中被改变过的查询结果表示成字符串
+ * @param	sql 数据库查询，第一个字段必须是 bool 值
+ * @return	查询结果
+ */
+CString LocalSto::rowsToStrIfNotChanged(CString sql)
+{
+	CString str = _T("");
+	sqlite3_stmt *stmt = NULL;
+	sqlite3_prepare(dbconn, (CW2A)sql, -1, &stmt, (const char**)&errmsg);
+	int col_count = sqlite3_column_count(stmt);
+	while (SQLITE_ROW == sqlite3_step(stmt)) {
+		int changed = sqlite3_column_int(stmt, 0);
+		if (changed) {
+			for (int i=1; i<col_count; i++) {
+				if (i>1)
+					str += _T("\t");
+				str += addslashesForSpace(CString((char *)sqlite3_column_text(stmt, i)));
+			}
+			str += _T("\n");
+		}
+	}
+	sqlite3_finalize(stmt);
+	return str;
 }
 /* @brief	将数据库查询结果表示成字符串
  * @param	sql 数据库查询
- * @return	查询结构
+ * @return	查询结果
  */
 CString LocalSto::rowsToStr(CString sql)
 {
@@ -206,9 +230,9 @@ bool LocalSto::addCourse(Course* course)
 bool LocalSto::uploadToCloud()
 {
 	CString data;
-	data = this->rowsToStr(_T("SELECT id,lecture_count FROM course"));
+	data = this->rowsToStrIfNotChanged(_T("SELECT changed,id,lecture_count FROM course"));
 	data += "\n";
-	data += this->rowsToStr(_T("SELECT id,numeric_id FROM product"));
+	data += this->rowsToStrIfNotChanged(_T("SELECT changed,id,numeric_id FROM product"));
 	data += "\n";
 	data += this->rowsToStr(_T("SELECT course,id,begin_time,end_time FROM lecture"));
 	data += "\n";
@@ -240,6 +264,7 @@ bool LocalSto::uploadToCloud()
 bool LocalSto::initDbFile()
 {
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS course ( \
+		changed INTEGER, \
 		id INTEGER PRIMARY KEY, \
 		course_id TEXT, \
 		name TEXT, \
@@ -248,13 +273,14 @@ bool LocalSto::initDbFile()
 		)")))
 		return false;
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS student ( \
-		course INTEGER, \
+		changed INTEGER, \
 		student_id TEXT, \
 		numeric_id TEXT UNIQUE, \
 		name TEXT \
 		)")))
 		return false;
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS product ( \
+		changed INTEGER, \
 		id INTEGER UNIQUE, \
 		numeric_id TEXT \
 		)")))

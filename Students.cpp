@@ -141,6 +141,13 @@ void Students::Start()
 	QuestionNum++;
 	for(int i = 0;i<64;i++)
 		AnswerCount[i] = 0;
+	Stu* curr = head->next;
+	while (curr != NULL) {
+		curr->Ans = 0;
+		curr->AnsTime = 0;
+		curr->mark = 0;
+		curr = curr->next;
+	}
 }
 /* @brief	接受USB传来的添加答案请求
  * @param	ProductId 答题器ID
@@ -149,10 +156,10 @@ void Students::Start()
  */
 bool Students::USBAddAnswer(UINT ProductId, BYTE ANS)
 {
-	if (ANS != 0)
+	bool flag = SignIn(ProductId);
+	if (flag && ANS != 0)
 		return AddAnswer(ProductId, ANS, (UINT)time(NULL) - beginTime);
-	else
-		return SignIn(ProductId);
+	return flag;
 }
 /* @brief	添加正确答案
  * @param	ANS 答案（1字节）
@@ -287,9 +294,11 @@ void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId))
 bool Students::SignIn(UINT ProductId)
 {
     Stu* now;
-    Sto->stuSignIn(ProductId); //保存签到信息到数据库
     if (now = FindByProductId(ProductId)) { //在名单中
-        now->Info->IsAtClass = true;
+		if (!now->Info->IsAtClass) {
+			now->Info->IsAtClass = true;
+			Sto->stuSignIn(ProductId); //保存签到信息到数据库
+		}
         return true;
     }
 	return false;

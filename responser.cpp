@@ -83,6 +83,26 @@ void test()
 	students->eachAnonymous(showStuAnonymous);
 
 	testRegister(students, 0x02, _T("0110007146"));
+
+	printf("Starting course...\n");
+	students->Start();
+
+	printf("add answer: ");
+	if (students->USBAddAnswer(0x02, 10))
+		printf("OK");
+	else
+		printf("failed");
+	printf("\n");
+
+	printf("add correct answer: ");
+	if (students->USBAddCorAnswer(20))
+		printf("OK");
+	else
+		printf("failed");
+	printf("\n");
+
+	printf("End of course\n");
+	students->End();
 }
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])

@@ -146,10 +146,12 @@ void Students::Start()
  */
 bool Students::USBAddAnswer(UINT ProductId, BYTE ANS)
 {
-	if (ANS == 0)
-		return SignIn(ProductId);
-	else
+	if (!SignIn(ProductId))
+		return false;
+	if (ANS != 0)
 		return AddAnswer(ProductId, ANS, (UINT)time(NULL) - beginTime);
+	else
+		return true;
 }
 /* @brief	添加正确答案
  * @param	ANS 答案（1字节）

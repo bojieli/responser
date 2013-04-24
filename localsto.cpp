@@ -17,6 +17,7 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 	this->error = 0;
 	this->StationID = StationID;
 	this->StationToken = StationToken;
+	this->course = 0;
 	if (SQLITE_OK != sqlite3_open("test.db", &this->dbconn)) {
 		error = 1;
 		Error(E_FATAL, _T("无法打开数据库"));
@@ -54,24 +55,53 @@ bool LocalSto::getCourses(Courses* c)
 {
 	return this->query(_T("SELECT id, name, info FROM course"), getcourse_callback, c);
 }
-/* @brief	设置选中的班级，开始一节课
+/* @brief	开始一节课
  * @param	course_id 班级ID字符串
- * @return	是否初始化成功
+ * @return	是否操作成功
  */
-bool LocalSto::setCurCourse(UINT courseID)
+bool LocalSto::beginCourse(UINT courseID)
 {
 	this->course = courseID;
-	int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
-	if (!squery(_T("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
-		goto error;
-	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
-		goto error;
-	this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
-	return true;
+	CString lastEndTime = selectFirst(
+		_T("SELECT lecture.end_time FROM lecture, course \
+		   WHERE course.id = %d AND lecture.course = course.id AND lecture.id = course.lecture_count"),
+		courseID);
+	if (lastEndTime == _T("0")) { // 上节课没有正常结束，需要继续进行上节课
+		this->lectureID = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
+		return (this->lectureID > 0);
+	}
+	else {
+		int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
+		if (!squery(_T("UPDATE course SET lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
+			goto error;
+		if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
+			goto error;
+		this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
+		return (this->lectureID > 0);
 error:
-	error = 4;
-	Error(E_FATAL, _T("数据库初始化课堂信息失败"));
-	return false;
+		error = 4;
+		Error(E_FATAL, _T("数据库初始化课堂信息失败"));
+		return false;
+	}
+}
+/* @brief	结束一节课
+ * @return	是否成功
+ */
+bool LocalSto::endCourse()
+{
+	if (!course) {
+		error = 12;
+		Error(E_FATAL, _T("在没有开始上课的时候结束上课"));
+		return false;
+	}
+	if (!squery(_T("UPDATE lecture SET end_time=%d WHERE course=%d AND id=%d"), time(NULL), course, lectureID)) {
+		error = 13;
+		Error(E_FATAL, _T("结束上课的数据库查询失败"));
+		return false;
+	}
+	course = 0;
+	lectureID = 0;
+	return true;
 }
 /* @brief	保存一道题的答题信息
  * @param	s 课堂对象

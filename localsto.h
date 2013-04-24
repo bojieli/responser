@@ -36,15 +36,17 @@ public:
 	~LocalSto(void);
 public:
 	bool getCourses(Courses* c);			  //初始化课程信息数据结构
-	bool setCurCourse(UINT courseID);	      //设置当前课程，设置后才能保存答题信息
+	bool beginCourse(UINT courseID);	      //开始一节课
+	bool endCourse();						  //结束这节课
 	bool addCourse(Course* c);				  //添加课程并获取课程ID
 public:
 	bool saveAnswers(Students* s);            //保存一道题的答题信息
 	bool saveCorAnswer(Students* s);		  //保存正确答案
 	bool setNumericId(CString NumericId, UINT ProductId); //设置学号
 	bool stuSignIn(UINT ProductId);			  //学生签到
-	bool initStuStaticList(Students* s); //初始化学生静态表
+	bool initStuStaticList(Students* s);	  //初始化学生静态表
 	bool initStudents(Students* s);			  //初始化学生动态表
+
 private:
 	CString rowsToStr(CString sql); // 将查询结果序列化出来
 	bool initDbFile();			//初始化数据库文件

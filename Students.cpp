@@ -115,12 +115,15 @@ Students::Students(LocalSto* sto, UINT course)
 	this->StuAtClass = 0;
 	this->StuAlreadyAns = 0;
 	this->Sto = sto;
-	sto->setCurCourse(course);
+	for(int i = 0;i<64;i++)
+		this->AnswerCount[i] = 0;
+	sto->beginCourse(course);
 	sto->initStuStaticList(this);
 	sto->initStudents(this);
 }
 Students::~Students(void)
 {
+	this->Sto->endCourse();
 	while (this->head != NULL)
 	{
 		Stu *temp = this->head;

@@ -27,7 +27,9 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 		Error(E_FATAL, _T("无法初始化数据库结构"));
 		return;
 	}
-	this->syncFromCloud();
+	// 必须先把本地的残余东西传干净才能同步新东西
+	if (this->uploadToCloud())
+		this->syncFromCloud();
 }
 LocalSto::~LocalSto()
 {

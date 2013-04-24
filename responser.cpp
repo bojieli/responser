@@ -49,6 +49,19 @@ void newCourse(Students* students, LocalSto* sto, Courses* courses)
 	students->each(showStu);
 }
 
+bool testRegister(Students* stu, UINT ProductId, CString NumericId)
+{
+	printf("Register [%u] %s ", ProductId, NumericId);
+	if (stu->Register(NumericId, ProductId)) {
+		printf("OK\n");
+		return true;
+	}
+	else {
+		printf("Error\n");
+		return false;
+	}
+}
+
 void test() 
 {
 	BaseStation station;
@@ -68,6 +81,8 @@ void test()
 	students->each(showStu);
 	printf("Info of anonymous students:\n");
 	students->eachAnonymous(showStuAnonymous);
+
+	testRegister(students, 0x02, _T("0110007146"));
 }
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])

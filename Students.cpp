@@ -16,7 +16,7 @@ StuStatic::StuStatic(CString NumericId)
 	this->Name = _T("匿名");
 	this->StudentId = CString();
 	this->NumericId = NumericId;
-	this->IsAtClass = true; // 匿名学生是到课的不在名单里的学生
+	this->IsAtClass = false; // 匿名学生是到课的不在名单里的学生
 }
 /* 新建哨兵 */
 StuStatic::StuStatic(void)
@@ -146,12 +146,10 @@ void Students::Start()
  */
 bool Students::USBAddAnswer(UINT ProductId, BYTE ANS)
 {
-	if (!SignIn(ProductId))
-		return false;
 	if (ANS != 0)
 		return AddAnswer(ProductId, ANS, (UINT)time(NULL) - beginTime);
 	else
-		return true;
+		return SignIn(ProductId);
 }
 /* @brief	添加正确答案
  * @param	ANS 答案（1字节）
@@ -174,33 +172,21 @@ bool Students::AddCorAnswer(BYTE ANS)
  * @param	ProductID 产品ID
  * @param	ANS	答案（1字节）
  * @param	ansTime 答题时间（从开始答题算起的秒数）
- * @return	是否添加成功，如果 ProductID 不在列表中则不成功
- * @note	匿名答题器在调用此函数答题前，必须通过 USBRegister 签到
+ * @return	是否添加成功
  */
 bool Students::AddAnswer(UINT ProductID, BYTE ANS, UINT AnsTime)
 {
 	Stu *now = FindByProductId(ProductID);
-	if(now!=NULL)
-	{
-		if(now->Ans==0) // 首次回答此题
-		{
-			StuAlreadyAns++;
-		}
-		if(!now->Info->IsAtClass) // 如果还没签到，先签到
-		{
-			StuAtClass++;
-			now->Info->IsAtClass = true;
-		}
-		if(now->Ans!=ANS) // 修改此题答案
-		{
-			AnswerCount[now->Ans]--;
-			AnswerCount[ANS]++;
-			now->Ans = ANS;
-		}
-		now->AnsTime = AnsTime;
-		return true;
-	}
-	else return false;
+	if (now == NULL || !now->Info->IsAtClass) // 查找失败或未签到，均视为非法请求
+		return false;
+	now->AnsTime = AnsTime;
+	now->Ans = ANS;
+	++AnswerCount[ANS];
+	if (now->Ans == 0) // 首次回答此题
+		StuAlreadyAns++;
+	else // 修改此题答案
+		AnswerCount[now->Ans]--;
+	return true;
 }
 /* @brief	结束答题
  * @return  若发送到服务器则返回1，若保存到U盘则返回0
@@ -211,23 +197,7 @@ bool Students::End(void)
 	Sto->saveAnswers(this);
 	return 0;
 }
-/* @brief	学生（答题器）签到
- * @param	ProductId 产品ID
- * @return	是否在名单中，如果不在名单中则匿名签到
- */
-bool Students::SignIn(UINT ProductId)
-{
-	Stu* now;
-	Sto->stuSignIn(ProductId);
-	if (now = FindByProductId(ProductId)) { //在名单中
-		now->Info->IsAtClass = true;
-		return true;
-	} else {
-		AddAnonymous(ProductId);
-		return false;
-	}
-}
-/* @brief	学生（答题器）设置学号
+/* @brief	学生（答题器）注册并签到
  * @param	NumericId	数字学号
  * @param	ProductId	产品ID
  * @return	是否在名单中，如果不在名单中则新建一个匿名学生
@@ -235,12 +205,14 @@ bool Students::SignIn(UINT ProductId)
  */
 bool Students::Register(CString NumericId, UINT ProductId)
 {
-	Sto->setNumericId(NumericId, ProductId);
+	Sto->setNumericId(NumericId, ProductId); // 保存到数据库
 	Stu* now = this->FindByProductId(ProductId);
-	if (now == NULL) { // 此答题器尚未注册
+	if (now == NULL) { // 此答题器尚未注册过
 		now = AddAnonymous(ProductId);
 	}
-	return SetInfoByNumericId(now, NumericId);
+	bool flag = SetInfoByNumericId(now, NumericId);
+	SignIn(ProductId);
+	return flag;
 }
 /* @brief	老师给学生正在回答的问题评分
  * @param	ProductId	产品ID
@@ -266,7 +238,6 @@ bool Students::Add(CString NumericId, UINT ProductId)
 	Stu* now = new Stu(ProductId); //数据库保证 ProductId 不重复
 	AddToList(now);
 	bool flag = SetInfoByNumericId(now, NumericId);
-	SignIn(ProductId);
 	return flag;
 }
 /* @brief	遍历在线学生
@@ -305,6 +276,21 @@ void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId))
 }
 
 // 以下是私有函数
+
+/* @brief	答题器签到
+ * @return	是否签到成功
+ * @note	签到之前必须注册
+ */
+bool Students::SignIn(UINT ProductId)
+{
+    Stu* now;
+    Sto->stuSignIn(ProductId); //保存签到信息到数据库
+    if (now = FindByProductId(ProductId)) { //在名单中
+        now->Info->IsAtClass = true;
+        return true;
+    }
+	return false;
+}
 void Students::AddToList(Stu* now) {
 	now->next = head->next;
 	head->next = now;

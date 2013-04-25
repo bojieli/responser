@@ -190,13 +190,13 @@ bool Students::AddAnswer(UINT ProductID, BYTE ANS, UINT AnsTime)
 	Stu *now = FindByProductId(ProductID);
 	if (now == NULL || !now->Info->IsAtClass) // 查找失败或未签到，均视为非法请求
 		return false;
+	if (now->Ans == 0) // 首次回答此题
+		++StuAlreadyAns;
+	else // 修改此题答案
+		--AnswerCount[now->Ans];
 	now->AnsTime = AnsTime;
 	now->Ans = ANS;
 	++AnswerCount[ANS];
-	if (now->Ans == 0) // 首次回答此题
-		StuAlreadyAns++;
-	else // 修改此题答案
-		AnswerCount[now->Ans]--;
 	return true;
 }
 /* @brief	结束答题

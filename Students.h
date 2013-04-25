@@ -122,7 +122,7 @@ public: //选定班级后实例化
 	Students(LocalSto* sto, UINT course);
 	~Students(void);
 public: //鼠标操作
-	void Start(); //开始答题
+	bool Start(); //开始答题
 	bool End(); //结束答题
 public: //答题器接口操作
 	bool USBAddAnswer(UINT ProductId, BYTE ANS); // USB答题和签到

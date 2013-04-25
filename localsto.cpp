@@ -34,7 +34,6 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 }
 LocalSto::~LocalSto()
 {
-	this->squery(_T("UPDATE lecture SET end_time=%ld WHERE course=%d AND id=%d"), time(NULL), course, lectureID);
 	if (SQLITE_OK != sqlite3_close(dbconn)) {
 		Error(E_WARNING, _T("无法正常关闭数据库"));
 		error = 3;
@@ -61,27 +60,30 @@ bool LocalSto::getCourses(Courses* c)
  */
 bool LocalSto::beginCourse(UINT courseID)
 {
+	if (this->course) {
+		error = 16;
+		Error(E_WARNING, _T("上节课还没有结束，这节课就开始了？"));
+		return false;
+	}
 	this->course = courseID;
-	int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%d"), courseID));
+	int lecture_count = atoi((CW2A)selectFirst(_T("SELECT lecture_count FROM course WHERE id=%u"), courseID));
 	if (lecture_count > 0) {
-		CString lastEndTime = selectFirst(
-			_T("SELECT lecture.end_time FROM lecture, course \
-			   WHERE course.id = %d AND lecture.course = course.id AND lecture.id = course.lecture_count"),
-			courseID);
-		if (lastEndTime.GetLength() == 0 || lastEndTime == _T("0")) { // 上节课没有正常结束，需要继续进行上节课
+		CString isAtClass = selectFirst(_T("SELECT isatclass FROM course WHERE id=%u"), courseID);
+		if (isAtClass == _T("1")) {
+			Error(E_WARNING, _T("上节课没有正常结束，将继续进行上一节课"));
 			this->lectureID = lecture_count;
 			return true;
 		}
 	}
-	if (!squery(_T("UPDATE course SET changed=1 AND lecture_count=lecture_count+1 WHERE course_id=%d"), courseID))
+	if (!squery(_T("UPDATE course SET changed=1, isatclass=1, lecture_count=lecture_count+1 WHERE id=%u"), courseID))
 		goto error;
-	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%d,%d,%d)"), courseID, lecture_count+1, time(NULL)))
+	if (!squery(_T("INSERT INTO lecture (course,id,begin_time) VALUES (%u,%d,%d)"), courseID, lecture_count+1, (UINT)time(NULL)))
 		goto error;
-	this->lectureID = (UINT)sqlite3_last_insert_rowid(this->dbconn);
-	return (this->lectureID > 0);
+	this->lectureID = lecture_count+1;
+	return true;
 error:
 	error = 4;
-	Error(E_FATAL, _T("数据库初始化课堂信息失败"));
+	Error(E_WARNING, _T("数据库初始化课堂信息失败"));
 	return false;
 }
 /* @brief	结束一节课
@@ -89,19 +91,23 @@ error:
  */
 bool LocalSto::endCourse()
 {
-	if (!course) {
+	if (course == 0) {
 		error = 12;
-		Error(E_FATAL, _T("在没有开始上课的时候结束上课"));
+		Error(E_WARNING, _T("在没有开始上课的时候结束上课"));
 		return false;
 	}
-	if (!squery(_T("UPDATE lecture SET end_time=%d WHERE course=%d AND id=%d"), time(NULL), course, lectureID)) {
-		error = 13;
-		Error(E_FATAL, _T("结束上课的数据库查询失败"));
-		return false;
-	}
+	if (!squery(_T("UPDATE lecture SET end_time=%d WHERE course=%u AND id=%u"), (UINT)time(NULL), course, lectureID))
+		goto error;
+	if (!squery(_T("UPDATE course SET isatclass=0 WHERE id=%u"), course))
+		goto error;
+	this->uploadToCloud();
 	course = 0;
 	lectureID = 0;
 	return true;
+error:
+	error = 13;
+	Error(E_WARNING, _T("结束上课的数据库查询失败"));
+	return false;
 }
 /* @brief	保存一道题的答题信息
  * @param	s 课堂对象
@@ -111,17 +117,22 @@ bool LocalSto::saveAnswers(Students *s)
 {
 	UINT currTime = (UINT)time(NULL);
 	if (!this->insert(_T("problem"), _T("course,lecture,problem,begin_time,end_time,correct_ans"),
-		course, lectureID, s->QuestionNum, s->beginTime, currTime, s->CorAnswer))
+		course, lectureID, s->QuestionNum, s->beginTime, currTime, s->CorAnswer)) {
+		error = 15;
+		Error(E_WARNING, _T("保存题目信息失败\n技术信息：\n") + CString(errmsg));
 		return false;
+	}
 	Stu* stu = s->head;
 	bool success = true;
 	while ((stu = stu->next) != NULL) {
-		if (!this->insert(_T("answer"), _T("course,lecture,problem,product,answer,ans_time,mark"),
-			course, lectureID, s->QuestionNum, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark))
+		if (!this->insert(_T("answer"), _T("course,lecture,problem,product,ans,ans_time,mark"),
+			course, lectureID, s->QuestionNum, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark)) {
+			error = 16;
+			Error(E_WARNING, _T("保存学生答案失败\n技术信息：\n") + CString(errmsg));
 			success = false;
+		}
 	}
-	if (success)
-		this->uploadToCloud();
+	this->uploadToCloud();
 	return success;
 }
 /* @brief	保存正确答案
@@ -131,8 +142,8 @@ bool LocalSto::saveAnswers(Students *s)
  */
 bool LocalSto::saveCorAnswer(Students *s)
 {
-	return this->squery(_T("UPDATE problem SET correct_ans=%d WHERE course=%d AND lecture=%d AND problem=%d"),
-		course, s->CorAnswer, lectureID, s->QuestionNum);
+	return this->squery(_T("UPDATE problem SET correct_ans=%u WHERE course=%u AND lecture=%u AND problem=%d"),
+		s->CorAnswer, course, lectureID, s->QuestionNum);
 }
 /* @brief	学生签到
  * @param	ProductId 产品ID
@@ -141,7 +152,7 @@ bool LocalSto::saveCorAnswer(Students *s)
 bool LocalSto::stuSignIn(UINT ProductId)
 {
 	return this->insert(_T("register"), _T("course,lecture,product,reg_time"),
-		course, lectureID, ProductId, time(NULL));
+		course, lectureID, ProductId, (UINT)time(NULL));
 }
 /* @brief	保存学生设置的学号
  * @param	NumericId 数字学号
@@ -249,7 +260,7 @@ bool LocalSto::uploadToCloud()
 		if (this->query(_T("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; DELETE FROM lecture")))
 			return true;
 		error = 6;
-		Error(E_WARNING, _T("无法清空数据库中的无效数据"));
+		Error(E_WARNING, _T("无法清空数据库中的已发送数据"));
 	}
 	else if (response == _T("")) {
 		error = 7;
@@ -265,6 +276,7 @@ bool LocalSto::initDbFile()
 {
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS course ( \
 		changed INTEGER, \
+		isatclass INTEGER, \
 		id INTEGER PRIMARY KEY, \
 		course_id TEXT, \
 		name TEXT, \
@@ -274,6 +286,7 @@ bool LocalSto::initDbFile()
 		return false;
 	if (!this->query(_T("CREATE TABLE IF NOT EXISTS student ( \
 		changed INTEGER, \
+		course INTEGER, \
 		student_id TEXT, \
 		numeric_id TEXT UNIQUE, \
 		name TEXT \
@@ -539,11 +552,11 @@ CString LocalSto::selectFirst(CString format, ...)
 
 	sqlite3_stmt *stmt = NULL;
 	sqlite3_prepare(dbconn, (CW2A)sql, -1, &stmt, (const char **)&errmsg);
-	char* retval = NULL;
+	CString retval = _T("");
 	if (SQLITE_ROW == sqlite3_step(stmt))
-		retval = _strdup((char*)sqlite3_column_text(stmt, 0));
+		retval = CString((char*)sqlite3_column_text(stmt, 0));
 	sqlite3_finalize(stmt);
-	return CString(retval);
+	return retval;
 }
 
 #define __GENERIC_INSERT(Type, DataHandler) \

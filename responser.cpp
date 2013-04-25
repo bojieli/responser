@@ -49,6 +49,13 @@ void newCourse(Students* students, LocalSto* sto, Courses* courses)
 	students->each(showStu);
 }
 
+#define DO_TEST(welcome,expr) \
+	printf(welcome "... "); \
+	if (expr) \
+		printf("OK\n"); \
+	else \
+		printf("failed\n");
+
 bool testRegister(Students* stu, UINT ProductId, CString NumericId)
 {
 	printf("Register [%u] %s ", ProductId, NumericId);
@@ -74,6 +81,7 @@ void test()
 	UINT course;
 	printf("input course ID: ");
 	scanf_s("%d", &course);
+	printf("Starting course...\n");
 	Students* students = new Students(sto, course);
 	printf("Info of %d static students:\n", students->InfoList.StuNum);
 	students->InfoList.each(showStuStatic);
@@ -84,25 +92,12 @@ void test()
 
 	testRegister(students, 0x02, _T("0110007146"));
 
-	printf("Starting course...\n");
-	students->Start();
+	DO_TEST("start problem", students->Start())
+	DO_TEST("add answer", students->USBAddAnswer(0x02, 10))
+	DO_TEST("add correct answer", students->USBAddCorAnswer(20))
+	DO_TEST("end of problem", students->End())
 
-	printf("add answer: ");
-	if (students->USBAddAnswer(0x02, 10))
-		printf("OK");
-	else
-		printf("failed");
-	printf("\n");
-
-	printf("add correct answer: ");
-	if (students->USBAddCorAnswer(20))
-		printf("OK");
-	else
-		printf("failed");
-	printf("\n");
-
-	printf("End of course\n");
-	students->End();
+	delete students;
 }
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])

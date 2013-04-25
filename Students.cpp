@@ -134,7 +134,7 @@ Students::~Students(void)
 
 /* @brief	开始一道新题目的答题
  */
-void Students::Start()
+bool Students::Start()
 {
 	isStarted = true;
 	StuAlreadyAns = 0;
@@ -148,6 +148,7 @@ void Students::Start()
 		curr->mark = 0;
 		curr = curr->next;
 	}
+	return true;
 }
 /* @brief	接受USB传来的添加答案请求
  * @param	ProductId 答题器ID
@@ -199,13 +200,12 @@ bool Students::AddAnswer(UINT ProductID, BYTE ANS, UINT AnsTime)
 	return true;
 }
 /* @brief	结束答题
- * @return  若发送到服务器则返回1，若保存到U盘则返回0
+ * @return  是否保存成功
  */
 bool Students::End(void) 
 {
 	this->isStarted = false;
-	Sto->saveAnswers(this);
-	return 0;
+	return Sto->saveAnswers(this);
 }
 /* @brief	学生（答题器）注册并签到
  * @param	NumericId	数字学号

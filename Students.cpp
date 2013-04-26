@@ -90,7 +90,7 @@ Stu::Stu(UINT ProductId)
 {
 	Info = NULL;
 	this->ProductId = ProductId;
-	isAnonymous = true;
+	isAnonymous = false;
 	next = NULL;
 	Ans = 0;
 	AnsTime = 0;

@@ -113,11 +113,13 @@ public:
 	UINT beginTime;			//答题开始时间
 	BYTE CorAnswer;			//最近一次正确答案
 	int QuestionNum;		//题目总数
-	int OnlineStuNum;		//到课学生总数
-	int StuAtClass;			//到位的学生总数
-	int StuAlreadyAns;		//已经答题的学生数目
 	bool isStarted;			//是否处于答题状态
 	UINT AnswerCount[64];   //记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f
+public: // 人数统计
+	int OnlineStuNum;		//动态表中的学生总数
+	int StuAtClass;			//到位的学生总数
+	int AnonymousNum;		//匿名学生总数
+	int StuAlreadyAns;		//已经答题的学生数目
 public: //选定班级后实例化
 	Students(LocalSto* sto, UINT course);
 	~Students(void);
@@ -142,6 +144,6 @@ private: // ===== 以下是私有函数 =====
 	bool AddCorAnswer(BYTE ANS); //添加正确答案
 	bool SignIn(UINT ProductId); //答题器签到
 	bool SetInfoByNumericId(Stu* now, CString NumericId);
-	Stu* AddAnonymous(UINT ProductId);
+	Stu* NewStu(UINT ProductId);
 	Stu* FindByProductId(UINT ProductId);
 };

@@ -110,6 +110,7 @@ Students::Students(LocalSto* sto, UINT course)
 	this->head = new Stu(0); //哨兵
 	this->QuestionNum = 0;
 	this->OnlineStuNum = 0;
+	this->AnonymousNum = 0;
 	this->course = course;
 	this->isStarted = false;
 	this->StuAtClass = 0;
@@ -158,8 +159,12 @@ bool Students::Start()
 bool Students::USBAddAnswer(UINT ProductId, BYTE ANS)
 {
 	bool flag = SignIn(ProductId);
-	if (flag && ANS != 0)
-		return AddAnswer(ProductId, ANS, (UINT)time(NULL) - beginTime);
+	if (flag && ANS != 0) {
+		if (this->isStarted)
+			return AddAnswer(ProductId, ANS, (UINT)time(NULL) - beginTime);
+		else
+			return false;
+	}
 	return flag;
 }
 /* @brief	添加正确答案
@@ -210,7 +215,7 @@ bool Students::End(void)
 /* @brief	学生（答题器）注册并签到
  * @param	NumericId	数字学号
  * @param	ProductId	产品ID
- * @return	是否在名单中，如果不在名单中则新建一个匿名学生
+ * @return	是否在静态名单中
  * @note	由于答题器键盘只能输入数字，服务器端维护了数字学号到真实学号和姓名的映射
  */
 bool Students::Register(CString NumericId, UINT ProductId)
@@ -218,7 +223,7 @@ bool Students::Register(CString NumericId, UINT ProductId)
 	Sto->setNumericId(NumericId, ProductId); // 保存到数据库
 	Stu* now = this->FindByProductId(ProductId);
 	if (now == NULL) { // 此答题器尚未注册过
-		now = AddAnonymous(ProductId);
+		now = NewStu(ProductId);
 	}
 	bool flag = SetInfoByNumericId(now, NumericId);
 	SignIn(ProductId);
@@ -297,6 +302,7 @@ bool Students::SignIn(UINT ProductId)
     if (now = FindByProductId(ProductId)) { //在名单中
 		if (!now->Info->IsAtClass) {
 			now->Info->IsAtClass = true;
+			++this->StuAtClass;
 			Sto->stuSignIn(ProductId); //保存签到信息到数据库
 		}
         return true;
@@ -313,14 +319,18 @@ bool Students::SetInfoByNumericId(Stu* now, CString NumericId)
 	StuStatic* info = InfoList.FindByNumericId(NumericId);
 	if (info == NULL) { // 学生不在静态名单中
 		now->Info = new StuStatic(NumericId);
+		now->isAnonymous = true;
+		++AnonymousNum;
 		return false;
 	} else { // 学生在静态名单中
 		now->Info = info;
+		if (now->isAnonymous) // 如果以前是匿名，则匿名总数减少了
+			--AnonymousNum;
 		now->isAnonymous = false;
 		return true;
 	}
 }
-Stu* Students::AddAnonymous(UINT ProductId)
+Stu* Students::NewStu(UINT ProductId)
 {
 	Stu* now = new Stu(ProductId);
 	AddToList(now);

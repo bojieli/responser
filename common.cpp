@@ -4,9 +4,10 @@
 void Error(int errorno, const wchar_t *errmsg)
 {
 	if (errorno == E_FATAL || errorno == E_WARNING) {
-		AfxMessageBox(errmsg);
+		TRACE(errmsg);
 	}
 	if (errorno == E_FATAL) {
+		AfxMessageBox(errmsg);
 		exit(1);
 	}
 }

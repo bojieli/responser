@@ -226,6 +226,7 @@ bool Students::Register(CString NumericId, UINT ProductId)
 		now = NewStu(ProductId);
 	} else { // 此答题器已经注册过，则原来的学生将不在课堂上
 		now->Info->IsAtClass = false;
+		--StuAtClass;
 	}
 	bool flag = SetInfoByNumericId(now, NumericId);
 	SignIn(ProductId);

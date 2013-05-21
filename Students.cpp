@@ -8,7 +8,9 @@ StuStatic::StuStatic(CString Name, CString StudentId, CString NumericId)
 	this->Name = Name;
 	this->StudentId = StudentId;
 	this->NumericId = NumericId;
-	this->IsAtClass = false;
+	this->AtClassCount = 0;
+	this->RefCount = 0;
+	this->next = NULL;
 }
 /* 新建匿名学生 */
 StuStatic::StuStatic(CString NumericId)
@@ -16,11 +18,19 @@ StuStatic::StuStatic(CString NumericId)
 	this->Name = _T("匿名");
 	this->StudentId = CString();
 	this->NumericId = NumericId;
-	this->IsAtClass = false; // 匿名学生是到课的不在名单里的学生
+	this->AtClassCount = 0;
+	this->RefCount = 0;
+	this->next = NULL;
 }
 /* 新建哨兵 */
 StuStatic::StuStatic(void)
 {
+	this->Name = CString();
+	this->StudentId = CString();
+	this->NumericId = CString();
+	this->AtClassCount = 0;
+	this->RefCount = 0;
+	this->next = NULL;
 }
 StuStatic::~StuStatic(void)
 {
@@ -30,6 +40,7 @@ StuStaticList::StuStaticList(void)
 {
 	head = new StuStatic();
 	StuNum = 0;
+	StuAtClass = 0;
 }
 StuStaticList::~StuStaticList(void)
 {
@@ -75,13 +86,13 @@ StuStatic* StuStaticList::FindByNumericId(CString NumericId)
 	return NULL;
 }
 /* @brief	遍历名单中的学生
- * @param	回调函数，参数依次为学生姓名、学号、数字学号
+ * @param	回调函数，参数为静态学生
  */
-void StuStaticList::each(void callback(CString Name, CString StudentId, CString NumericId, bool IsAtClass))
+void StuStaticList::each(void callback(StuStatic* s))
 {
 	StuStatic* curr = head->next;
 	while (curr != NULL) {
-		callback(curr->Name, curr->StudentId, curr->NumericId, curr->IsAtClass);
+		callback(curr);
 		curr = curr->next;
 	}
 }
@@ -90,7 +101,8 @@ Stu::Stu(UINT ProductId)
 {
 	Info = NULL;
 	this->ProductId = ProductId;
-	isAnonymous = false;
+	isAnonymous = true; // 如果没找到对应的 Info，当然是匿名
+	isAtClass = false;
 	next = NULL;
 	Ans = 0;
 	AnsTime = 0;
@@ -109,7 +121,7 @@ Students::Students(LocalSto* sto, UINT course)
 {
 	this->head = new Stu(0); //哨兵
 	this->QuestionNum = 0;
-	this->OnlineStuNum = 0;
+	this->StudentCount = 0;
 	this->AnonymousNum = 0;
 	this->course = course;
 	this->isStarted = false;
@@ -192,8 +204,9 @@ bool Students::AddCorAnswer(BYTE ANS)
  */
 bool Students::AddAnswer(UINT ProductID, BYTE ANS, UINT AnsTime)
 {
+	SignIn(ProductID); // 如果没签到，先签到
 	Stu *now = FindByProductId(ProductID);
-	if (now == NULL || !now->Info->IsAtClass) // 查找失败或未签到，均视为非法请求
+	if (now == NULL) // 查找失败，均视为非法请求
 		return false;
 	if (now->Ans == 0) // 首次回答此题
 		++StuAlreadyAns;
@@ -220,13 +233,20 @@ bool Students::End(void)
  */
 bool Students::Register(CString NumericId, UINT ProductId)
 {
-	Sto->setNumericId(NumericId, ProductId); // 保存到数据库
+	Sto->setNumericId(NumericId, ProductId); // 保存到数据库（数据库会自动保证 ProductId 的唯一性）
 	Stu* now = this->FindByProductId(ProductId);
 	if (now == NULL) { // 此答题器尚未注册过
 		now = NewStu(ProductId);
-	} else { // 此答题器已经注册过，则原来的学生将不在课堂上
-		now->Info->IsAtClass = false;
-		--StuAtClass;
+	} else { // 此答题器已经注册过，则取消注册
+		if (now->isAtClass) { // 如果名单中此人已经到课，则取消之
+			if (0 == --now->Info->AtClassCount)
+				--InfoList.StuAtClass;
+			--StuAtClass;
+		}
+		--now->Info->RefCount;
+		if (--now->Info->RefCount == 0 && now->isAnonymous) // 如果匿名学生已经无人引用，垃圾回收
+			delete now->Info;
+		now->Info = NULL;
 	}
 	bool flag = SetInfoByNumericId(now, NumericId);
 	SignIn(ProductId);
@@ -272,23 +292,23 @@ void Students::each(void callback(Stu* stu))
 /* @brief	遍历在线学生
  * @param	回调函数，参数依次为答题器ID、学生姓名、学号、数字学号
  */
-void Students::each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId))
+void Students::each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId, bool isAtClass))
 {
 	Stu* curr = head->next;
 	while (curr != NULL) {
-		callback(curr->ProductId, curr->Info->Name, curr->Info->StudentId, curr->Info->NumericId);
+		callback(curr->ProductId, curr->Info->Name, curr->Info->StudentId, curr->Info->NumericId, curr->isAtClass);
 		curr = curr->next;
 	}
 }
 /* @brief	遍历匿名学生
  * @param	回调函数，参数依次为答题器ID、数字学号
  */
-void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId))
+void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId, bool isAtClass))
 {
 	Stu* curr = head->next;
 	while (curr != NULL) {
 		if (curr->isAnonymous)
-			callback(curr->ProductId, curr->Info->NumericId);
+			callback(curr->ProductId, curr->Info->NumericId, curr->isAtClass);
 		curr = curr->next;
 	}
 }
@@ -302,34 +322,51 @@ void Students::eachAnonymous(void callback(UINT ProductId, CString NumericId))
 bool Students::SignIn(UINT ProductId)
 {
     Stu* now;
-    if (now = FindByProductId(ProductId)) { //在名单中
-		if (!now->Info->IsAtClass) {
-			now->Info->IsAtClass = true;
-			++this->StuAtClass;
+    if (now = FindByProductId(ProductId)) { // 已经注册
+		if (!now->isAtClass) { // 如果已经签到过了则不用重复签到
+			now->isAtClass = true;
+			++StuAtClass;
+			if (now->Info->AtClassCount++ == 0 && !now->isAnonymous) // 如果名单中此人尚未到课，且在静态名单中，则需要更新名单到课人数
+				++InfoList.StuAtClass;
 			Sto->stuSignIn(ProductId); //保存签到信息到数据库
 		}
         return true;
-    }
-	return false;
+    } else { // 尚未注册
+		return false;
+	}
 }
+/* @brief	私有函数，添加学生到动态表
+ * @note	学生必须不在动态表中，且已经被初始化
+ */
 void Students::AddToList(Stu* now) {
 	now->next = head->next;
 	head->next = now;
-	++OnlineStuNum;
+	if (now->isAnonymous)
+		++AnonymousNum;
+	++StudentCount;
 }
+/* @brief	私有函数，根据学号设置学生信息
+ * @return	新学生是否在静态名单中
+ * @note	假设原来学生是没有注册的。调用者必须在调用本方法前取消已存在的注册
+ */
 bool Students::SetInfoByNumericId(Stu* now, CString NumericId)
 {
 	StuStatic* info = InfoList.FindByNumericId(NumericId);
 	if (info == NULL) { // 学生不在静态名单中
-		now->Info = new StuStatic(NumericId);
-		now->isAnonymous = true;
-		++AnonymousNum;
+		if (!now->isAnonymous) { // 原来在静态名单中
+			now->isAnonymous = true;
+			++AnonymousNum;
+		}
+		now->Info = new StuStatic(NumericId); // 创建一个匿名学生
+		now->Info->RefCount = 1;
 		return false;
 	} else { // 学生在静态名单中
-		now->Info = info;
-		if (now->isAnonymous) // 如果以前是匿名，则匿名总数减少了
+		if (now->isAnonymous) { // 原来不在静态名单中
+			now->isAnonymous = false;
 			--AnonymousNum;
-		now->isAnonymous = false;
+		}
+		now->Info = info;
+		++now->Info->RefCount;
 		return true;
 	}
 }

@@ -1,15 +1,5 @@
 /******************************************文件说明*****************************************
 Students.h 以及 Students.cpp 主要用于存储学生答题
-结构体 Answer 存储一个答案
-类 Stu 存储一个学生的基本信息以及他的答案
-类 Students 存储一系列学生以及对外的接口，只有一个实例
-另外，整个通信函数也都全部在这里面
-
-allStu 为整个工程的全局变量
-
-对外接口如下：
-每次开始答题时调用 allStu.Start(); 初始化数据库
-收到一个学生的答题结果后调用 allStu.AddAnswer(BYTE* ID,Answer* ANS)
 
 整个数据更改流程：
 1、当老师允许注册时，学生才能输入学号。注册时学生将学号和产品ID绑定在一起，以后学生只需要用产品ID即可。此时上位机只接收注册帧。
@@ -21,31 +11,7 @@ allStu 为整个工程的全局变量
 3、增加一种即席模式，也就是不需要任何注册就能凭借ID答题。
 平时当老师不允许注册时，是不会有新的学生加入的。
 
-
-allStu提供给外部的接口函数如下：
-针对StuStatic m_List,它只需要在老师选择完班级之后添加即可，因此只有一个接口
-allStu.m_List.NewStuStatic()
-
-public: //答题操作
-	void Start(); //开始答题
-	bool End(); //结束答题，若发送到服务器则返回1，若保存到U盘则返回0
-
-	int USBAddAnswer(BYTE* ProductID, BYTE ANS, UINT ansTime); 
-	在答题模式和课前模式中使用，在开启课前模式时调用开始答题，来判断哪些学生已经到了
-
-	void USBAddCorAnswer(BYTE ANS);//添加正确答案，教师笔或者按键提供
-public: //注册操作
-	bool USBRegister(BYTE* ID,BYTE* ProductID); //注册到课堂
-
-
-用到的数据接口
-public: //答题基本情况
-	int QuesTotal;//题目总数,显示所需要的数据
-	int StudTotal;//学生总数，显示所需要的数据
-	int StuAtClass;//到位的学生总数，显示所需要的数据
-	int StuAlreadyAns;//已经答题的学生数目，显示所需要的数据
-	bool isStarted;//是否处于答题状态，显示所需要的数据
-	BYTE AnswerCount[64];//记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f;//显示所需要的数据
+API参见 responser.cpp 中的调用示例。
 
 ********************************************文件说明****************************************/
 
@@ -60,7 +26,8 @@ public:
 	CString Name;		//姓名
 	CString StudentId;	//学号
 	CString NumericId;	//数字学号
-	bool IsAtClass;		//是否在课堂上
+	int AtClassCount;	//在课堂上的实例计数
+	int RefCount;		//被动态表引用的计数
 	StuStatic* next;
 public:
 	StuStatic(CString Name, CString StudentID, CString NumericId); // 新建普通学生
@@ -72,18 +39,20 @@ public:
 class StuStaticList
 {
 public:
-	StuStatic* head;
-	int StuNum;	// 名单中的学生总数
+	StuStaticList(void);
+	~StuStaticList(void);
 public: //查找学生
 	StuStatic* FindByStudentId(CString StudentId);
 	StuStatic* FindByNumericId(CString NumericId);
 public: //添加学生
 	StuStatic* Add(CString Name, CString StudentId, CString NumericId);
-public:
-	StuStaticList(void);
-	~StuStaticList(void);
 public: //遍历名单
-	void each(void callback(CString Name, CString StudentId, CString NumericId, bool IsAtClass));
+	void each(void callback(StuStatic* s));
+
+public:
+	StuStatic* head;
+	int StuNum;				//名单中的学生总数
+	int StuAtClass;			//名单中在课堂的学生总数
 };
 
 class Stu
@@ -92,6 +61,7 @@ public:
 	StuStatic* Info;		//学生静态信息
 	UINT ProductId;			//答题器ID
 	bool isAnonymous;		//是否匿名
+	bool isAtClass;			//是否在课堂上
 	Stu* next;				//学生链表下一元素
 public: // 学生作答信息
 	BYTE Ans;				//最近一次作答的答案
@@ -105,21 +75,6 @@ public:
 class Students
 {
 	friend class LocalSto;
-public:
-	UINT course;			//班级编号
-	LocalSto* Sto;			//数据库连接
-	Stu* head;				//学生链表，head 是哨兵
-	StuStaticList InfoList;	//学生静态信息链表
-	UINT beginTime;			//答题开始时间
-	BYTE CorAnswer;			//最近一次正确答案
-	int QuestionNum;		//题目总数
-	bool isStarted;			//是否处于答题状态
-	UINT AnswerCount[64];   //记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f
-public: // 人数统计
-	int OnlineStuNum;		//动态表中的学生总数
-	int StuAtClass;			//到位的学生总数
-	int AnonymousNum;		//匿名学生总数
-	int StuAlreadyAns;		//已经答题的学生数目
 public: //选定班级后实例化
 	Students(LocalSto* sto, UINT course);
 	~Students(void);
@@ -133,10 +88,33 @@ public: //答题器接口操作
 	bool TeacherMark(UINT ProductId, BYTE mark); // 老师给学生评分
 public: //从数据库初始化
 	bool Add(CString NumericId, UINT ProductId);
-public:
+public: //遍历学生
 	void each(void callback(Stu* stu));
-	void each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId)); //遍历已签到的学生
-	void eachAnonymous(void callback(UINT ProductId, CString NumericId)); //遍历匿名学生
+	void each(void callback(UINT ProductId, CString Name, CString StudentId, CString NumericId, bool isAtClass)); //遍历已签到的学生
+	void eachAnonymous(void callback(UINT ProductId, CString NumericId, bool isAtClass)); //遍历匿名学生
+public: // 人数统计
+	int GetStuTotal(void) {return StudentCount;} // 动态表中学生总数
+	int GetStaticStuTotal(void) {return InfoList.StuNum;} // 静态表中学生总数
+	int GetStuAtClass(void) {return StuAtClass;} // 到课学生总数
+	int GetStaticStuAtClass(void) {return InfoList.StuAtClass;} // 静态表中到课学生总数
+	int GetAnonymousNum(void) {return AnonymousNum;} // 匿名学生数
+	int GetStuAlreadyAns(void) {return StuAlreadyAns;} // 已经答题的学生数
+
+public:
+	UINT course;			//班级编号
+	LocalSto* Sto;			//数据库连接
+	Stu* head;				//学生链表，head 是哨兵
+	StuStaticList InfoList;	//学生静态信息链表
+	UINT beginTime;			//答题开始时间
+	BYTE CorAnswer;			//最近一次正确答案
+	int QuestionNum;		//题目总数
+	bool isStarted;			//是否处于答题状态
+	UINT AnswerCount[64];   //记录每一种答案的数目，总共可以选择A B C D E F 六个答案 0x00~0x3f
+private:
+	int StudentCount;		//动态表中的学生总数
+	int StuAtClass;			//到位的学生总数
+	int AnonymousNum;		//匿名学生总数
+	int StuAlreadyAns;		//已经答题的学生数目
 
 private: // ===== 以下是私有函数 =====
 	void AddToList(Stu* stu);

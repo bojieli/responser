@@ -21,19 +21,27 @@ using namespace std;
 void showCourse(Course* c) {
 	wprintf_s(L"%u %s %s\n", c->id, c->name, c->info);
 }
-void showStu(UINT ProductId, CString Name, CString StudentId, CString NumericId)
+void showStu(UINT ProductId, CString Name, CString StudentId, CString NumericId, bool isAtClass)
 {
-	wprintf_s(L"[%u]\t%s\t%s\t%s\n", ProductId, Name, StudentId, NumericId);
+	wprintf_s(L"[%u]\t%s\t%s\t%s", ProductId, Name, StudentId, NumericId);
+	if (isAtClass)
+		wprintf_s(L"\tIsAtClass");
+	wprintf_s(L"\n");
 }
-void showStuAnonymous(UINT ProductId, CString NumericId)
+void showStuAnonymous(UINT ProductId, CString NumericId, bool isAtClass)
 {
-	wprintf_s(L"[%u]\t%s\n", ProductId, NumericId);
+	wprintf_s(L"[%u]\t%s", ProductId, NumericId);
+	if (isAtClass)
+		wprintf_s(L"\tIsAtClass");
+	wprintf_s(L"\n");
 }
-void showStuStatic(CString Name, CString StudentId, CString NumericId, bool IsAtClass)
+void showStuStatic(StuStatic* s)
 {	
-	wprintf_s(L"%s\t%s\t%s\t", Name, StudentId, NumericId);
-	if (IsAtClass)
+	wprintf_s(L"%s\t%s\t%s\t", s->Name, s->StudentId, s->NumericId);
+	if (s->AtClassCount == 1)
 		wprintf_s(L"IsAtClass");
+	else if (s->AtClassCount > 1)
+		wprintf_s(L"IsAtClass (%d instances)", s->AtClassCount);
 	wprintf_s(L"\n");
 }
 
@@ -83,12 +91,6 @@ void test()
 	scanf_s("%d", &course);
 	printf("Starting course...\n");
 	Students* students = new Students(sto, course);
-	printf("Info of %d static students:\n", students->InfoList.StuNum);
-	students->InfoList.each(showStuStatic);
-	printf("Info of %d online students:\n", students->OnlineStuNum);
-	students->each(showStu);
-	printf("Info of anonymous students:\n");
-	students->eachAnonymous(showStuAnonymous);
 
 	testRegister(students, 0x02, _T("0110007146"));
 
@@ -96,6 +98,16 @@ void test()
 	DO_TEST("add answer", students->USBAddAnswer(0x02, 10))
 	DO_TEST("add correct answer", students->USBAddCorAnswer(20))
 	DO_TEST("end of problem", students->End())
+
+	
+	printf("\n%d static students, %d online:\n",
+		students->GetStaticStuTotal(), students->GetStaticStuAtClass());
+	students->InfoList.each(showStuStatic);
+	printf("\n%d dynamic students, %d online, %d already answered:\n",
+		students->GetStuTotal(), students->GetStuAtClass(), students->GetStuAlreadyAns());
+	students->each(showStu);
+	printf("\n%d anonymous students:\n", students->GetAnonymousNum());
+	students->eachAnonymous(showStuAnonymous);
 
 	delete students;
 }

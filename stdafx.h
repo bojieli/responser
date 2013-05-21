@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "common.h"
+#include "errors.h"
 #include "targetver.h"
 
 #include <stdio.h>

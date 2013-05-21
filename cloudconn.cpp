@@ -18,7 +18,7 @@ CloudConn::CloudConn(CString path)
 								 INTERNET_FLAG_RELOAD);
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
-		Error(E_WARNING, _T("无法连接到服务器"));
+		Error(E_WARNING, T_CLOUD_CANNOT_CONNECT);
 	}
 }
 CloudConn::~CloudConn()
@@ -50,12 +50,12 @@ CString CloudConn::send(UINT StationID, CString StationToken)
 		file->SendRequest(header, header.GetLength(), (CW2A)postData, postData.GetLength());
 	} catch(CInternetException * m_pException) {
 		m_pException->Delete();
-		Error(E_WARNING, _T("无法连接到服务器"));
+		Error(E_WARNING, T_CLOUD_CANNOT_CONNECT);
 		return _T("");
 	}
 	file->QueryInfoStatusCode(dwRet);
     if(dwRet != HTTP_STATUS_OK) {
-		Error(E_WARNING, _T("与云端间的数据通信错误"));
+		Error(E_WARNING, T_CLOUD_REJECT_BY_REMOTE);
 		return _T("");
     }
 

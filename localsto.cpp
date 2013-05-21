@@ -19,13 +19,11 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 	this->StationToken = StationToken;
 	this->course = 0;
 	if (SQLITE_OK != sqlite3_open("test.db", &this->dbconn)) {
-		error = 1;
-		Error(E_FATAL, _T("无法打开数据库"));
+		Error(E_FATAL, T_DB_CANNOT_OPEN);
 		return;
 	}
 	if (!this->initDbFile()) {
-		error = 2;
-		Error(E_FATAL, _T("无法初始化数据库结构"));
+		Error(E_FATAL, T_DB_CANNOT_INIT);
 		return;
 	}
 	// 必须先把本地的残余东西传干净才能同步新东西
@@ -34,10 +32,8 @@ LocalSto::LocalSto(UINT StationID, CString StationToken)
 }
 LocalSto::~LocalSto()
 {
-	if (SQLITE_OK != sqlite3_close(dbconn)) {
-		Error(E_WARNING, _T("无法正常关闭数据库"));
-		error = 3;
-	}
+	if (SQLITE_OK != sqlite3_close(dbconn))
+		Error(E_WARNING, T_DB_CANNOT_CLOSE);
 }
 /* INTERNAL */
 static int getcourse_callback(void* courses, int cols, char** values, char** fields)
@@ -61,8 +57,7 @@ bool LocalSto::getCourses(Courses* c)
 bool LocalSto::beginCourse(UINT courseID)
 {
 	if (this->course) {
-		error = 16;
-		Error(E_WARNING, _T("上节课还没有结束，这节课就开始了？"));
+		Error(E_WARNING, T_BEGIN_CLASS_BEFORE_END);
 		return false;
 	}
 	this->course = courseID;
@@ -70,7 +65,7 @@ bool LocalSto::beginCourse(UINT courseID)
 	if (lecture_count > 0) {
 		CString isAtClass = selectFirst(_T("SELECT isatclass FROM course WHERE id=%u"), courseID);
 		if (isAtClass == _T("1")) {
-			Error(E_WARNING, _T("上节课没有正常结束，将继续进行上一节课"));
+			Error(E_WARNING, T_LAST_CLASS_NOT_ENDED);
 			this->lectureID = lecture_count;
 			return true;
 		}
@@ -82,8 +77,7 @@ bool LocalSto::beginCourse(UINT courseID)
 	this->lectureID = lecture_count+1;
 	return true;
 error:
-	error = 4;
-	Error(E_WARNING, _T("数据库初始化课堂信息失败"));
+	Error(E_WARNING, T_DB_CANNOT_BEGIN_CLASS);
 	return false;
 }
 /* @brief	结束一节课
@@ -92,8 +86,7 @@ error:
 bool LocalSto::endCourse()
 {
 	if (course == 0) {
-		error = 12;
-		Error(E_WARNING, _T("在没有开始上课的时候结束上课"));
+		Error(E_WARNING, T_END_CLASS_BEFORE_BEGIN);
 		return false;
 	}
 	if (!squery(_T("UPDATE lecture SET end_time=%d WHERE course=%u AND id=%u"), (UINT)time(NULL), course, lectureID))
@@ -105,8 +98,7 @@ bool LocalSto::endCourse()
 	lectureID = 0;
 	return true;
 error:
-	error = 13;
-	Error(E_WARNING, _T("结束上课的数据库查询失败"));
+	Error(E_WARNING, T_DB_CANNOT_END_CLASS);
 	return false;
 }
 /* @brief	保存一道题的答题信息
@@ -118,8 +110,7 @@ bool LocalSto::saveAnswers(Students *s)
 	UINT currTime = (UINT)time(NULL);
 	if (!this->insert(_T("problem"), _T("course,lecture,problem,begin_time,end_time,correct_ans"),
 		course, lectureID, s->QuestionNum, s->beginTime, currTime, s->CorAnswer)) {
-		error = 15;
-		Error(E_WARNING, _T("保存题目信息失败\n技术信息：\n") + CString(errmsg));
+		Error(E_WARNING, T_DB_SAVE_PROBLEM_FAILED);
 		return false;
 	}
 	Stu* stu = s->head;
@@ -127,8 +118,7 @@ bool LocalSto::saveAnswers(Students *s)
 	while ((stu = stu->next) != NULL) {
 		if (!this->insert(_T("answer"), _T("course,lecture,problem,product,ans,ans_time,mark"),
 			course, lectureID, s->QuestionNum, stu->ProductId, stu->Ans, stu->AnsTime, stu->mark)) {
-			error = 16;
-			Error(E_WARNING, _T("保存学生答案失败\n技术信息：\n") + CString(errmsg));
+			Error(E_WARNING, T_DB_SAVE_ANSWER_FAILED);
 			success = false;
 		}
 	}
@@ -216,8 +206,7 @@ CString LocalSto::rowsToStr(CString sql)
 bool LocalSto::addCourse(Course* course)
 {
 	if (!insert(_T("course"), _T("name,info"), course->name, course->info)) {
-		error = 5;
-		Error(E_FATAL, _T("无法保存课程到本地数据库\n技术信息：\n") + CString(errmsg));
+		Error(E_FATAL, T_DB_SAVE_COURSE_FAILED);
 		return false;
 	}
 	sqlite3_int64 course_id = sqlite3_last_insert_rowid(dbconn);
@@ -229,8 +218,7 @@ bool LocalSto::addCourse(Course* course)
 	cloud->RawBody(data);
 	CString response = cloud->send(StationID, StationToken);
 	if (response != _T("OK")) {
-		error = 6;
-		Error(E_NOTICE, _T("无法保存课程到服务器"));
+		Error(E_NOTICE, T_DB_UPLOAD_COURSE_FAILED);
 		return false;
 	}
 	return true;
@@ -259,17 +247,12 @@ bool LocalSto::uploadToCloud()
 	if (response == _T("OK")) {
 		if (this->query(_T("DELETE FROM register; DELETE FROM problem; DELETE FROM answer; DELETE FROM lecture")))
 			return true;
-		error = 6;
-		Error(E_WARNING, _T("无法清空数据库中的已发送数据"));
+		Error(E_WARNING, T_DB_CANNOT_CLEAN_TABLES);
 	}
-	else if (response == _T("")) {
-		error = 7;
-		Error(E_NOTICE, _T("无法连接到云端"));
-	}
-	else {
-		error = 8;
-		Error(E_WARNING, _T("上传到云端过程中内部错误"));
-	}
+	else if (response == _T(""))
+		Error(E_NOTICE, T_CLOUD_CANNOT_CONNECT);
+	else
+		Error(E_WARNING, T_CLOUD_UPLOAD_INTERNAL);
 	return false;
 }
 bool LocalSto::initDbFile()
@@ -349,8 +332,7 @@ bool LocalSto::syncFromCloud()
 	CloudConn *cloud = new CloudConn(_T("sync"));
 	CString response = cloud->send(StationID, StationToken);
 	if (response == _T("")) {
-		error = 10;
-		Error(E_NOTICE, _T("无法连接到云端"));
+		Error(E_NOTICE, T_CLOUD_CANNOT_CONNECT);
 		return false;
 	}
 	response = this->loadDataInStr(_T("course"), _T("id,course_id,name,lecture_count,info"), 5, response);
@@ -360,8 +342,7 @@ bool LocalSto::syncFromCloud()
 	response = this->loadDataInStr(_T("product"), _T("id,numeric_id"), 2, response);
 	return true;
 error:
-	error = 9;
-	Error(E_FATAL, _T("从云端下载的数据格式错误"));
+	Error(E_FATAL, T_CLOUD_RECV_DATA_INVALID);
 	return false;
 }
 
@@ -403,14 +384,11 @@ CString LocalSto::loadDataInStr(CString table, CString columns, const int column
 	}
 	if (firstLine == true) // 没有数据
 		return str;
-	if (!this->query(sql)) {
-		error = 11;
-		Error(E_WARNING, _T("从云端同步数据时数据库错误\n技术信息：\n") + CString(errmsg) + _T("\n") + sql);
-	}
+	if (!this->query(sql))
+		Error(E_WARNING, T_DB_SAVE_FROM_CLOUD_FAILED);
 	return str;
 error:
-	error = 9;
-	Error(E_FATAL, _T("从云端下载的数据格式错误"));
+	Error(E_FATAL, T_CLOUD_RECV_DATA_INVALID);
 	return _T("");
 }
 /* @brief	用本地数据库初始化学生静态表

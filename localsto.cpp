@@ -527,7 +527,7 @@ bool LocalSto::update(CString table, CString searchField, CString searchValue, C
 }
 bool LocalSto::query(CString sql)
 {
-	return (SQLITE_OK == sqlite3_exec(dbconn, (CW2A)sql, NULL, 0, &errmsg));
+	return (SQLITE_OK == sqlite3_exec(dbconn, CW2A(sql, CP_UTF8), NULL, 0, &errmsg));
 }
 bool LocalSto::squery(CString format, ...)
 {
@@ -540,7 +540,7 @@ bool LocalSto::squery(CString format, ...)
 }
 bool LocalSto::query(CString sql, int (*callback)(void*,int,char**,char**), void* argtocallback)
 {
-	return (SQLITE_OK == sqlite3_exec(dbconn, (CW2A)sql, callback, argtocallback, &errmsg));
+	return (SQLITE_OK == sqlite3_exec(dbconn, CW2A(sql, CP_UTF8), callback, argtocallback, &errmsg));
 }
 CString LocalSto::selectFirst(CString format, ...)
 {

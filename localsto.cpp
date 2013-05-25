@@ -38,7 +38,11 @@ LocalSto::~LocalSto()
 /* INTERNAL */
 static int getcourse_callback(void* courses, int cols, char** values, char** fields)
 {
-	Course* newc = new Course((UINT)atoi(values[0]), CString(values[1]), CString(values[2]));
+	Course* newc = new Course(
+		(UINT)atoi(values[0]),
+		CString(CA2W((LPCSTR)values[1], CP_UTF8)), // 注意 UTF8 到 Unicode 编码转换
+		CString(CA2W((LPCSTR)values[2], CP_UTF8))
+	);
 	((Courses*)courses)->add(newc);
 	return 0;
 }
@@ -404,7 +408,7 @@ bool LocalSto::initStuStaticList(Students* s)
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
 		CString StudentId = CString(sqlite3_column_text(stmt, 0));
 		CString NumericId = CString(sqlite3_column_text(stmt, 1));
-		CString Name = CString(sqlite3_column_text(stmt, 2));
+		CString Name = CString(CA2W((LPCSTR)sqlite3_column_text(stmt, 2), CP_UTF8)); // 注意 UTF8 与 Unicode 编码转换
 		s->InfoList.Add(Name, StudentId, NumericId);
 	}
 	sqlite3_finalize(stmt);
